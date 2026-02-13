@@ -1,0 +1,209 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 12px;
+    gap: 8px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0 8px;
+}
+
+.title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.slot-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.slot-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    width: 100%;
+}
+
+.slot-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.slot-item:active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.slot-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    flex-shrink: 0;
+}
+
+.slot-app-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slot-item.assigned .slot-app-name {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.slot-item.empty .slot-app-name {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.slot-shortcut {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+}
+
+.app-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+}
+
+.app-picker {
+    width: 100%;
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+}
+
+.app-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.app-picker-clear {
+    font-family: inherit;
+    font-size: 11px;
+    padding: 3px 8px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 100, 100, 0.8);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.app-picker-clear:hover {
+    background: rgba(255, 100, 100, 0.15);
+}
+
+.app-picker-search {
+    margin: 0 10px 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.9);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.app-picker-search::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.app-picker-search:focus {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.app-picker-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 6px 6px;
+}
+
+.app-picker-item {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    transition: background 0.1s;
+}
+
+.app-picker-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.app-picker-empty {
+    padding: 20px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 12px;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
