@@ -1,0 +1,64 @@
+import { useState, useEffect, useRef } from "react";
+import type { AppInfo } from "../types";
+
+interface AppPickerProps {
+  apps: AppInfo[];
+  slotIndex: number;
+  onSelect: (app: AppInfo | null) => void;
+  onClose: () => void;
+}
+
+export default function AppPicker({
+  apps,
+  slotIndex,
+  onSelect,
+  onClose,
+}: AppPickerProps) {
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const filtered = apps.filter((app) =>
+    app.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <div className="app-picker-overlay" onClick={onClose}>
+      <div className="app-picker" onClick={(e) => e.stopPropagation()}>
+        <div className="app-picker-header">
+          <span>
+            Slot {slotIndex + 1} — &#x2325;{slotIndex + 1}
+          </span>
+          <button className="app-picker-clear" onClick={() => onSelect(null)}>
+            Clear
+          </button>
+        </div>
+        <input
+          ref={inputRef}
+          className="app-picker-search"
+          type="text"
+          placeholder="Search apps..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="app-picker-list">
+          {filtered.map((app) => (
+            <button
+              key={app.path}
+              className="app-picker-item"
+              onClick={() => onSelect(app)}
+            >
+              {app.name}
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <div className="app-picker-empty">No apps found</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
