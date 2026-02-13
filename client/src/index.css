@@ -1,0 +1,23 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    background: transparent;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+        system-ui, sans-serif;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    overflow: hidden;
+}
+
+#root {
+    width: 100%;
+    height: 100vh;
+}
