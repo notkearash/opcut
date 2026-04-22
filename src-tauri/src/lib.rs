@@ -8,6 +8,8 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     ActivationPolicy, AppHandle, Emitter, Manager,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt as PosWindowExt};
 use tauri_plugin_store::StoreExt;
@@ -77,12 +79,18 @@ fn launch_slot(app: &AppHandle, slot_index: usize) {
 fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let toggle: Shortcut = "Alt+0".parse()?;
     let h0 = app.clone();
+    let held0 = Arc::new(AtomicBool::new(false));
     app.global_shortcut()
-        .on_shortcut(toggle, move |_app, _shortcut, event| {
-            if event.state() != ShortcutState::Pressed {
-                return;
+        .on_shortcut(toggle, move |_app, _shortcut, event| match event.state() {
+            ShortcutState::Pressed => {
+                if held0.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+                toggle_main_window(&h0);
             }
-            toggle_main_window(&h0);
+            ShortcutState::Released => {
+                held0.store(false, Ordering::SeqCst);
+            }
         })?;
 
     let shortcut_keys = [
@@ -92,16 +100,22 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
     for (i, key) in shortcut_keys.iter().enumerate() {
         let shortcut: Shortcut = key.parse()?;
         let h = app.clone();
+        let held = Arc::new(AtomicBool::new(false));
         app.global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state() != ShortcutState::Pressed {
-                    return;
+            .on_shortcut(shortcut, move |_app, _shortcut, event| match event.state() {
+                ShortcutState::Pressed => {
+                    if held.swap(true, Ordering::SeqCst) {
+                        return;
+                    }
+                    if is_main_visible(&h) {
+                        show_main_window(&h);
+                        let _ = h.emit("open-picker", i);
+                    } else {
+                        launch_slot(&h, i);
+                    }
                 }
-                if is_main_visible(&h) {
-                    show_main_window(&h);
-                    let _ = h.emit("open-picker", i);
-                } else {
-                    launch_slot(&h, i);
+                ShortcutState::Released => {
+                    held.store(false, Ordering::SeqCst);
                 }
             })?;
     }
