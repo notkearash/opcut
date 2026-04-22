@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppInfo, AppConfig, SlotConfig } from "./types";
 import SlotGrid from "./components/SlotGrid";
@@ -23,6 +24,15 @@ function App() {
       if (!payload) {
         getCurrentWindow().hide();
       }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  useEffect(() => {
+    const unlisten = listen<number>("open-picker", (event) => {
+      setPickerSlot(event.payload);
     });
     return () => {
       unlisten.then((fn) => fn());

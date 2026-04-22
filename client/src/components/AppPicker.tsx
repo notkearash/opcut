@@ -43,6 +43,15 @@ export default function AppPicker({
           placeholder="Search apps..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (filtered.length > 0) onSelect(filtered[0]);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            }
+          }}
         />
         <div className="app-picker-list">
           {filtered.map((app) => (

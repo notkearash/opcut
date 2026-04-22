@@ -6,9 +6,9 @@ use config::SlotConfig;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Manager,
+    ActivationPolicy, AppHandle, Emitter, Manager,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt as PosWindowExt};
 use tauri_plugin_store::StoreExt;
 
@@ -25,6 +25,21 @@ fn toggle_main_window(app: &AppHandle) {
     }
 }
 
+fn show_main_window(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let _ = window.move_window(Position::TrayCenter);
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+fn is_main_visible(app: &AppHandle) -> bool {
+    app.get_webview_window("main")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false)
+}
+
 fn launch_slot(app: &AppHandle, slot_index: usize) {
     let store = app.store("config.json").expect("failed to access store");
     let config: SlotConfig = store
@@ -38,6 +53,16 @@ fn launch_slot(app: &AppHandle, slot_index: usize) {
 }
 
 fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let toggle: Shortcut = "Alt+0".parse()?;
+    let h0 = app.clone();
+    app.global_shortcut()
+        .on_shortcut(toggle, move |_app, _shortcut, event| {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            toggle_main_window(&h0);
+        })?;
+
     let shortcut_keys = [
         "Alt+1", "Alt+2", "Alt+3", "Alt+4", "Alt+5", "Alt+6", "Alt+7", "Alt+8", "Alt+9",
     ];
@@ -46,8 +71,16 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
         let shortcut: Shortcut = key.parse()?;
         let h = app.clone();
         app.global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, _event| {
-                launch_slot(&h, i);
+            .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                if event.state() != ShortcutState::Pressed {
+                    return;
+                }
+                if is_main_visible(&h) {
+                    show_main_window(&h);
+                    let _ = h.emit("open-picker", i);
+                } else {
+                    launch_slot(&h, i);
+                }
             })?;
     }
     Ok(())
