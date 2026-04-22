@@ -12,9 +12,6 @@
     "global-shortcut:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "store:default",
-    "positioner:default",
-    "positioner:allow-move-window",
-    "positioner:allow-set-tray-icon-state"
+    "store:default"
   ]
 }

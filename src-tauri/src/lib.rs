@@ -6,13 +6,14 @@ use config::SlotConfig;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Emitter, Manager,
+    ActivationPolicy, AppHandle, Emitter, Manager, PhysicalPosition,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-use tauri_plugin_positioner::{Position, WindowExt as PosWindowExt};
 use tauri_plugin_store::StoreExt;
+
+struct TrayRect(Mutex<Option<(f64, f64, f64, f64)>>);
 
 #[cfg(target_os = "macos")]
 fn apply_macos_window_behavior(app: &AppHandle) {
@@ -36,6 +37,24 @@ fn apply_macos_window_behavior(app: &AppHandle) {
     }
 }
 
+fn position_near_tray(app: &AppHandle, window: &tauri::WebviewWindow) {
+    let tray_rect = app
+        .state::<TrayRect>()
+        .0
+        .lock()
+        .ok()
+        .and_then(|g| *g);
+    let Some((tx, ty, tw, _th)) = tray_rect else {
+        return;
+    };
+    let Ok(ws) = window.outer_size() else {
+        return;
+    };
+    let x = tx + tw / 2.0 - ws.width as f64 / 2.0;
+    let y = ty;
+    let _ = window.set_position(PhysicalPosition::new(x, y));
+}
+
 fn toggle_main_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -43,7 +62,7 @@ fn toggle_main_window(app: &AppHandle) {
     if window.is_visible().unwrap_or(false) {
         let _ = window.hide();
     } else {
-        let _ = window.move_window(Position::TrayCenter);
+        position_near_tray(app, &window);
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -53,7 +72,7 @@ fn show_main_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
-    let _ = window.move_window(Position::TrayCenter);
+    position_near_tray(app, &window);
     let _ = window.show();
     let _ = window.set_focus();
 }
@@ -126,7 +145,6 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::get_installed_apps,
@@ -136,6 +154,7 @@ pub fn run() {
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
+            app.manage(TrayRect(Mutex::new(None)));
 
             let quit = MenuItem::with_id(app, "quit", "Quit opcut", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;
@@ -152,7 +171,20 @@ pub fn run() {
                 })
                 .on_tray_icon_event(|tray, event| {
                     let app = tray.app_handle();
-                    tauri_plugin_positioner::on_tray_event(app, &event);
+                    let rect = match &event {
+                        TrayIconEvent::Click { rect, .. }
+                        | TrayIconEvent::Enter { rect, .. }
+                        | TrayIconEvent::Leave { rect, .. }
+                        | TrayIconEvent::Move { rect, .. } => Some(rect.clone()),
+                        _ => None,
+                    };
+                    if let Some(rect) = rect {
+                        let pos = rect.position.to_physical::<f64>(1.0);
+                        let size = rect.size.to_physical::<f64>(1.0);
+                        if let Ok(mut g) = app.state::<TrayRect>().0.lock() {
+                            *g = Some((pos.x, pos.y, size.width, size.height));
+                        }
+                    }
 
                     if matches!(
                         event,
