@@ -23,6 +23,14 @@ pub fn list_installed_apps() -> Vec<AppInfo> {
     for dir in ["/Applications", "/System/Applications"] {
         collect_apps_from_dir(dir, &mut apps, true);
     }
+    // Finder lives outside the usual app directories; include it explicitly.
+    let finder_path = "/System/Library/CoreServices/Finder.app";
+    if std::path::Path::new(finder_path).exists() {
+        apps.push(AppInfo {
+            name: "Finder".to_string(),
+            path: finder_path.to_string(),
+        });
+    }
     apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     apps.dedup_by(|a, b| a.path == b.path);
     apps
