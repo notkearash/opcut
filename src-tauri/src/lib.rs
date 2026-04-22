@@ -12,6 +12,28 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt as PosWindowExt};
 use tauri_plugin_store::StoreExt;
 
+#[cfg(target_os = "macos")]
+fn apply_macos_window_behavior(app: &AppHandle) {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(ns_window_ptr) = window.ns_window() else {
+        return;
+    };
+    if ns_window_ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let ns_window: &NSWindow = &*(ns_window_ptr as *mut AnyObject as *mut NSWindow);
+        let behavior = NSWindowCollectionBehavior::CanJoinAllSpaces
+            | NSWindowCollectionBehavior::FullScreenAuxiliary;
+        ns_window.setCollectionBehavior(behavior);
+    }
+}
+
 fn toggle_main_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -132,6 +154,9 @@ pub fn run() {
                 .build(app)?;
 
             register_shortcuts(app.handle())?;
+
+            #[cfg(target_os = "macos")]
+            apply_macos_window_behavior(app.handle());
 
             Ok(())
         })
