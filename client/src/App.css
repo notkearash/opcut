@@ -132,20 +132,11 @@
     color: rgba(255, 255, 255, 0.5);
 }
 
-.app-picker-clear {
-    font-family: inherit;
-    font-size: 11px;
-    padding: 3px 8px;
-    border: none;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 100, 100, 0.8);
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.app-picker-clear:hover {
-    background: rgba(255, 100, 100, 0.15);
+.app-picker-hint {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 0.3px;
 }
 
 .app-picker-search {

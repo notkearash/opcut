@@ -32,9 +32,7 @@ export default function AppPicker({
           <span>
             Slot {slotIndex + 1} — &#x2325;{slotIndex + 1}
           </span>
-          <button className="app-picker-clear" onClick={() => onSelect(null)}>
-            Clear
-          </button>
+          <span className="app-picker-hint">&#x2318;⌫ to clear</span>
         </div>
         <input
           ref={inputRef}
@@ -50,6 +48,9 @@ export default function AppPicker({
             } else if (e.key === "Escape") {
               e.preventDefault();
               onClose();
+            } else if (e.key === "Backspace" && e.metaKey) {
+              e.preventDefault();
+              onSelect(null);
             }
           }}
         />
