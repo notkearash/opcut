@@ -1,9 +1,18 @@
 .container {
+    position: absolute;
+    inset: 24px;
     display: flex;
     flex-direction: column;
-    height: 100vh;
     padding: 12px;
     gap: 8px;
+    background: rgba(30, 30, 30, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.45),
+        0 2px 8px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
 }
 
 .header {
@@ -90,7 +99,7 @@
 }
 
 .app-picker-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.8);
     display: flex;
@@ -98,11 +107,12 @@
     justify-content: center;
     z-index: 100;
     padding: 16px;
+    border-radius: 12px;
 }
 
 .app-picker {
     width: 100%;
-    max-height: calc(100vh - 32px);
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     background: rgba(30, 30, 30, 0.95);
