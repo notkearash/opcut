@@ -6,7 +6,7 @@ use config::SlotConfig;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Manager, PhysicalPosition,
+    ActivationPolicy, AppHandle, Emitter, Manager, PhysicalPosition,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -113,7 +113,16 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
                     if held.swap(true, Ordering::SeqCst) {
                         return;
                     }
-                    launch_slot(&h, i);
+                    // Window open → ⌥N assigns that slot; window hidden → ⌥N launches it.
+                    let visible = h
+                        .get_webview_window("main")
+                        .and_then(|w| w.is_visible().ok())
+                        .unwrap_or(false);
+                    if visible {
+                        let _ = h.emit("assign-slot", i);
+                    } else {
+                        launch_slot(&h, i);
+                    }
                 }
                 ShortcutState::Released => {
                     held.store(false, Ordering::SeqCst);
