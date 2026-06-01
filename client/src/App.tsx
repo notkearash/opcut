@@ -1,28 +1,152 @@
-import { useState, useEffect, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { AppInfo, AppConfig, SlotConfig } from "./types";
-import SlotGrid from "./components/SlotGrid";
-import AppPicker from "./components/AppPicker";
+import { LogicalSize } from "@tauri-apps/api/dpi";
+import type { ResultRow } from "./types";
+import { useAppData } from "./hooks/useAppData";
+import { useKeyboardNav } from "./hooks/useKeyboardNav";
+import { parseQuery } from "./lib/parseQuery";
+import { fuzzySearch } from "./lib/fuzzy";
+import { launchOrFocusApp, runAgentQuery } from "./lib/tauri";
+import {
+  MAX_VISIBLE,
+  WIN_W,
+  settingsWindowHeight,
+  windowHeight,
+} from "./lib/layout";
+import SearchBar from "./components/SearchBar";
+import ResultList from "./components/ResultList";
+import SettingsView from "./components/SettingsView";
 import "./App.css";
 
-function App() {
-  const [slots, setSlots] = useState<(AppConfig | null)[]>(Array(9).fill(null));
-  const [apps, setApps] = useState<AppInfo[]>([]);
-  const [pickerSlot, setPickerSlot] = useState<number | null>(null);
+type View = "search" | "settings";
 
-  useEffect(() => {
-    invoke<SlotConfig>("get_slot_config").then((config) => {
-      setSlots(config.slots);
-    });
-    invoke<AppInfo[]>("get_installed_apps").then(setApps);
+function App() {
+  const { apps, slots, setSlots, agentConfig, home } = useAppData();
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<View>("search");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const hideAndReset = useCallback(() => {
+    getCurrentWindow().hide();
+    setQuery("");
+    setView("search");
   }, []);
 
+  // --- query parsing & result building -------------------------------------
+  const parsed = useMemo(
+    () =>
+      parseQuery(query, {
+        homeDir: home,
+        defaultCwd: agentConfig?.default_cwd ?? "~",
+        agents: agentConfig?.agents ?? [],
+      }),
+    [query, home, agentConfig],
+  );
+
+  const results = useMemo<ResultRow[]>(() => {
+    if (parsed.kind === "agent") {
+      const cwdLabel = parsed.cwd.replace(home, "~");
+      return [
+        {
+          kind: "agent",
+          id: "agent-run",
+          badge: `?${parsed.agentId}`,
+          title: parsed.prompt || `Open ${parsed.label}`,
+          subtitle: `${parsed.label} · ${cwdLabel}${parsed.cwdSource === "default" ? " (default)" : ""}`,
+          onActivate: () =>
+            runAgentQuery(parsed.agentId, parsed.prompt, parsed.cwd).finally(
+              hideAndReset,
+            ),
+        },
+      ];
+    }
+
+    if (parsed.kind === "agent-menu") {
+      const agents = agentConfig?.agents ?? [];
+      return agents
+        .filter(
+          (a) =>
+            a.id.startsWith(parsed.partial) ||
+            a.label.toLowerCase().startsWith(parsed.partial),
+        )
+        .map((a) => ({
+          kind: "agent" as const,
+          id: `agent-menu-${a.id}`,
+          badge: `?${a.id}`,
+          title: a.label,
+          subtitle: `coding agent · runs ${a.program}`,
+          onActivate: () => {
+            setQuery(`?${a.id} `);
+            inputRef.current?.focus();
+          },
+        }));
+    }
+
+    if (parsed.kind === "command-menu") {
+      const commands = [
+        {
+          id: "slots",
+          title: "Configure quick slots",
+          subtitle: "assign apps to ⌥1–9",
+          run: () => setView("settings"),
+        },
+      ];
+      return commands
+        .filter(
+          (c) =>
+            c.id.startsWith(parsed.partial) ||
+            c.title.toLowerCase().includes(parsed.partial),
+        )
+        .map((c) => ({
+          kind: "command" as const,
+          id: `cmd-${c.id}`,
+          badge: "›",
+          title: c.title,
+          subtitle: c.subtitle,
+          onActivate: c.run,
+        }));
+    }
+
+    if (parsed.kind === "apps") {
+      return fuzzySearch(parsed.text, apps, (a) => a.name)
+        .slice(0, MAX_VISIBLE)
+        .map((m) => ({
+          kind: "app" as const,
+          id: m.item.path,
+          title: m.item.name,
+          matchIndices: m.indices,
+          onActivate: () => launchOrFocusApp(m.item.path).finally(hideAndReset),
+        }));
+    }
+
+    // empty query → assigned quick slots
+    return slots
+      .map((app, i) => ({ app, i }))
+      .filter((s): s is { app: NonNullable<typeof s.app>; i: number } => s.app !== null)
+      .map(({ app, i }) => ({
+        kind: "slot" as const,
+        id: `slot-${i}`,
+        badge: String(i + 1),
+        title: app.name,
+        subtitle: `⌥${i + 1}`,
+        onActivate: () => launchOrFocusApp(app.path).finally(hideAndReset),
+      }));
+  }, [parsed, apps, slots, home, hideAndReset, agentConfig]);
+
+  const { selected, setSelected, onKeyDown } = useKeyboardNav(results, hideAndReset);
+
+  // --- window lifecycle ----------------------------------------------------
+  // Reset to a fresh prompt on show; hide + reset on focus loss.
   useEffect(() => {
-    const unlisten = getCurrentWindow().onFocusChanged(({ payload }) => {
-      if (!payload) {
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (focused) {
+        setQuery("");
+        setView("search");
+        inputRef.current?.focus();
+      } else {
         getCurrentWindow().hide();
+        setQuery("");
+        setView("search");
       }
     });
     return () => {
@@ -30,51 +154,84 @@ function App() {
     };
   }, []);
 
+  // Keep focus on the input whenever we're in search view.
   useEffect(() => {
-    const unlisten = listen<number>("open-picker", (event) => {
-      setPickerSlot(event.payload);
+    if (view === "search") inputRef.current?.focus();
+  }, [view, results]);
+
+  // --- dynamic window height ----------------------------------------------
+  const lastH = useRef(0);
+  useLayoutEffect(() => {
+    const h =
+      view === "settings"
+        ? settingsWindowHeight()
+        : windowHeight(results.length, query.trim().length > 0);
+    if (h === lastH.current) return;
+    lastH.current = h;
+    const raf = requestAnimationFrame(() => {
+      getCurrentWindow().setSize(new LogicalSize(WIN_W, h));
     });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, []);
+    return () => cancelAnimationFrame(raf);
+  }, [results.length, view, query]);
 
-  const handleSlotClick = useCallback((index: number) => {
-    setPickerSlot(index);
-  }, []);
+  // --- render --------------------------------------------------------------
+  if (view === "settings") {
+    return (
+      <div className="shell">
+        <SettingsView
+          apps={apps}
+          slots={slots}
+          onSlotsChange={setSlots}
+          onClose={() => setView("search")}
+        />
+      </div>
+    );
+  }
 
-  const handleAppSelect = useCallback(
-    async (app: AppInfo | null) => {
-      if (pickerSlot === null) return;
-
-      const appConfig: AppConfig | null = app
-        ? { name: app.name, path: app.path }
-        : null;
-
-      const config = await invoke<SlotConfig>("set_slot_config", {
-        slotIndex: pickerSlot,
-        appConfig,
-      });
-      setSlots(config.slots);
-      setPickerSlot(null);
-    },
-    [pickerSlot],
-  );
+  const agentLabel = parsed.kind === "agent" ? parsed.label : undefined;
+  const aiActive = parsed.kind === "agent" || parsed.kind === "agent-menu";
+  const hasQuery = query.trim().length > 0;
 
   return (
-    <div className="container">
-      <div className="header">
-        <span className="title">opcut</span>
-      </div>
-      <SlotGrid slots={slots} onSlotClick={handleSlotClick} />
-      {pickerSlot !== null && (
-        <AppPicker
-          apps={apps}
-          slotIndex={pickerSlot}
-          onSelect={handleAppSelect}
-          onClose={() => setPickerSlot(null)}
-        />
+    <div className="shell">
+      <SearchBar
+        ref={inputRef}
+        value={query}
+        onChange={setQuery}
+        onKeyDown={onKeyDown}
+        aiActive={aiActive}
+        agentLabel={agentLabel}
+        onOpenSettings={() => setView("settings")}
+      />
+      {results.length > 0 && (
+        <>
+          <div className="divider" />
+          <ResultList rows={results} selected={selected} onHover={setSelected} />
+          <Footer count={results.length} />
+        </>
       )}
+      {results.length === 0 && hasQuery && (
+        <>
+          <div className="divider" />
+          <div className="empty-state">
+            {parsed.kind === "apps" ? "No matching apps" : "No results"}
+          </div>
+          <Footer count={0} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function Footer({ count }: { count: number }) {
+  return (
+    <div className="footer">
+      <span className="footer-left">
+        {count > 0 ? `${count} result${count === 1 ? "" : "s"}` : ""}
+      </span>
+      <span className="footer-keys">
+        <kbd>↑↓</kbd> navigate <kbd>↵</kbd> open <kbd>esc</kbd> dismiss
+      </span>
     </div>
   );
 }
