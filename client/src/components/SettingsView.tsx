@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { AppConfig, AppInfo } from "../types";
 import { setSlotConfig } from "../lib/tauri";
 import SlotGrid from "./SlotGrid";
@@ -8,6 +8,10 @@ interface SettingsViewProps {
   apps: AppInfo[];
   slots: (AppConfig | null)[];
   onSlotsChange: (slots: (AppConfig | null)[]) => void;
+  /** Slot whose app-picker is open, or null. Controlled by App so the
+   *  global ⌥1–9 shortcut (delivered via the `assign-slot` event) can open it. */
+  pickerSlot: number | null;
+  onPickerSlotChange: (slot: number | null) => void;
   onClose: () => void;
 }
 
@@ -16,21 +20,18 @@ export default function SettingsView({
   apps,
   slots,
   onSlotsChange,
+  pickerSlot,
+  onPickerSlotChange,
   onClose,
 }: SettingsViewProps) {
-  const [pickerSlot, setPickerSlot] = useState<number | null>(null);
-
-  // Keyboard slot selection: plain 1–9 opens the picker for that slot, Esc goes back.
-  // Plain digits (no ⌥) so they don't collide with the global ⌥1–9 launch shortcuts.
+  // Esc backs out. ⌥1–9 is a global shortcut handled in Rust (it never reaches
+  // the webview), so the slot opens via the `assign-slot` event in App, not here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (pickerSlot !== null) return; // AppPicker owns the keyboard while open
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
-      } else if (/^[1-9]$/.test(e.key) && !e.metaKey && !e.altKey && !e.ctrlKey) {
-        e.preventDefault();
-        setPickerSlot(Number(e.key) - 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -42,25 +43,26 @@ export default function SettingsView({
     const cfg: AppConfig | null = app ? { name: app.name, path: app.path } : null;
     const updated = await setSlotConfig(pickerSlot, cfg);
     onSlotsChange(updated.slots);
-    setPickerSlot(null);
+    onPickerSlotChange(null);
   };
 
   return (
     <div className="settings-view">
       <div className="settings-header">
         <span className="settings-title">Quick slots</span>
-        <span className="settings-hint">press 1–9 to assign · ⌘⌫ clears</span>
+        <span className="settings-hint">press ⌥1–9 to assign · ⌘⌫ clears</span>
         <button className="settings-done" onClick={onClose}>
           esc
         </button>
       </div>
-      <SlotGrid slots={slots} onSlotClick={setPickerSlot} />
+      <SlotGrid slots={slots} onSlotClick={onPickerSlotChange} />
       {pickerSlot !== null && (
         <AppPicker
+          key={pickerSlot}
           apps={apps}
           slotIndex={pickerSlot}
           onSelect={handleSelect}
-          onClose={() => setPickerSlot(null)}
+          onClose={() => onPickerSlotChange(null)}
         />
       )}
     </div>

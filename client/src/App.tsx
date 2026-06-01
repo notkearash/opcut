@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import type { ResultRow } from "./types";
 import { useAppData } from "./hooks/useAppData";
@@ -24,12 +25,14 @@ function App() {
   const { apps, slots, setSlots, agentConfig, home } = useAppData();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>("search");
+  const [pickerSlot, setPickerSlot] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const hideAndReset = useCallback(() => {
     getCurrentWindow().hide();
     setQuery("");
     setView("search");
+    setPickerSlot(null);
   }, []);
 
   // --- query parsing & result building -------------------------------------
@@ -142,12 +145,26 @@ function App() {
       if (focused) {
         setQuery("");
         setView("search");
+        setPickerSlot(null);
         inputRef.current?.focus();
       } else {
         getCurrentWindow().hide();
         setQuery("");
         setView("search");
+        setPickerSlot(null);
       }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // Global ⌥1–9 while the window is open: Rust emits `assign-slot` (it can't
+  // reach the webview as a keystroke). Jump into settings with that slot's picker.
+  useEffect(() => {
+    const unlisten = listen<number>("assign-slot", ({ payload: slot }) => {
+      setView("settings");
+      setPickerSlot(slot);
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -182,7 +199,12 @@ function App() {
           apps={apps}
           slots={slots}
           onSlotsChange={setSlots}
-          onClose={() => setView("search")}
+          pickerSlot={pickerSlot}
+          onPickerSlotChange={setPickerSlot}
+          onClose={() => {
+            setView("search");
+            setPickerSlot(null);
+          }}
         />
       </div>
     );
