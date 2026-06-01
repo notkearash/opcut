@@ -66,6 +66,12 @@ impl Default for AgentConfig {
                     program: "codex".to_string(),
                     args_before: vec![],
                 },
+                AgentTemplate {
+                    id: "pi".to_string(),
+                    label: "pi".to_string(),
+                    program: "pi".to_string(),
+                    args_before: vec![],
+                },
             ],
         }
     }
