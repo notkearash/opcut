@@ -6,18 +6,26 @@ interface SearchBarProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   /** Whether we're in an agent context (`?` menu or `?xx` run) — drives the AI animation. */
   aiActive: boolean;
+  /** Whether we're in shell mode (`!` prefix) — swaps the glyph for a shell prompt. */
+  shellActive: boolean;
   /** When set, shows a chip naming the chosen agent. */
   agentLabel?: string;
   onOpenSettings: () => void;
 }
 
 const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
-  ({ value, onChange, onKeyDown, aiActive, agentLabel, onOpenSettings }, ref) => {
+  ({ value, onChange, onKeyDown, aiActive, shellActive, agentLabel, onOpenSettings }, ref) => {
     return (
-      <div className="search-bar" data-agent={aiActive ? "true" : "false"}>
+      <div
+        className="search-bar"
+        data-agent={aiActive ? "true" : "false"}
+        data-shell={shellActive ? "true" : "false"}
+      >
         <span className="search-glyph" aria-hidden>
           {aiActive ? (
             <span className="ai-orb" />
+          ) : shellActive ? (
+            "❯"
           ) : (
             "⌕"
           )}
@@ -33,7 +41,7 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           placeholder={
             agentLabel
               ? "describe the task…"
-              : "Search apps · ? agents · > commands"
+              : "Search · ? agents · > commands · ! shell"
           }
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -7,7 +7,7 @@ import { useAppData } from "./hooks/useAppData";
 import { useKeyboardNav } from "./hooks/useKeyboardNav";
 import { parseQuery } from "./lib/parseQuery";
 import { fuzzySearch } from "./lib/fuzzy";
-import { launchOrFocusApp, runAgentQuery } from "./lib/tauri";
+import { launchOrFocusApp, runAgentQuery, runShellCommand } from "./lib/tauri";
 import {
   MAX_VISIBLE,
   WIN_W,
@@ -83,6 +83,33 @@ function App() {
             inputRef.current?.focus();
           },
         }));
+    }
+
+    if (parsed.kind === "shell") {
+      const cwdLabel = parsed.cwd.replace(home, "~");
+      if (!parsed.command) {
+        return [
+          {
+            kind: "shell",
+            id: "shell-hint",
+            badge: "!",
+            title: "Run a shell command",
+            subtitle: `type a command · ${cwdLabel}`,
+            onActivate: () => {},
+          },
+        ];
+      }
+      return [
+        {
+          kind: "shell",
+          id: "shell-run",
+          badge: "!",
+          title: parsed.command,
+          subtitle: `run in terminal · ${cwdLabel}${parsed.cwdSource === "default" ? " (default)" : ""}`,
+          onActivate: () =>
+            runShellCommand(parsed.command, parsed.cwd).finally(hideAndReset),
+        },
+      ];
     }
 
     if (parsed.kind === "command-menu") {
@@ -212,6 +239,7 @@ function App() {
 
   const agentLabel = parsed.kind === "agent" ? parsed.label : undefined;
   const aiActive = parsed.kind === "agent" || parsed.kind === "agent-menu";
+  const shellActive = parsed.kind === "shell";
   const hasQuery = query.trim().length > 0;
 
   return (
@@ -222,6 +250,7 @@ function App() {
         onChange={setQuery}
         onKeyDown={onKeyDown}
         aiActive={aiActive}
+        shellActive={shellActive}
         agentLabel={agentLabel}
         onOpenSettings={() => setView("settings")}
       />
