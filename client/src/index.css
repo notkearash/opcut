@@ -24,6 +24,12 @@
     --sel-bg: rgba(var(--accent-rgb), 0.1);
     --sel-edge: rgba(var(--accent-rgb), 0.22);
 
+    /* AI accent — warm yellow→pink, surfaces only while `?` is active */
+    --ai-warm: #ffd56b;
+    --ai-warm-rgb: 255, 213, 107;
+    --ai-pink: #ff7ab8;
+    --ai-pink-rgb: 255, 122, 184;
+
     --radius-panel: 16px;
     --radius-row: 10px;
 }
