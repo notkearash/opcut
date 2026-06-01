@@ -117,6 +117,36 @@ pub fn run_agent_in_ghostty(
     Ok(())
 }
 
+/// Run an arbitrary shell command in a Ghostty window, in `cwd`. After the command exits we
+/// `exec` an interactive login shell so the window stays open and the output remains visible.
+pub fn run_shell_in_ghostty(command: &str, cwd: &str) -> Result<(), String> {
+    if !std::path::Path::new("/Applications/Ghostty.app").exists() {
+        return Err("Ghostty not found in /Applications".to_string());
+    }
+
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    // `command` is raw user input — it IS the shell command, so it is interpolated unquoted.
+    let script = format!(
+        "cd {} && {}; exec {} -l",
+        shell_quote(cwd),
+        command,
+        shell_quote(&shell),
+    );
+
+    Command::new("open")
+        .arg("-n")
+        .arg("-a")
+        .arg("Ghostty")
+        .arg("--args")
+        .arg("-e")
+        .arg("/bin/sh")
+        .arg("-lc")
+        .arg(script)
+        .spawn()
+        .map_err(|e| format!("Failed to launch Ghostty: {}", e))?;
+    Ok(())
+}
+
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }

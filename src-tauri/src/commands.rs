@@ -102,3 +102,9 @@ pub fn run_agent_query(
         config.use_cd_fallback,
     )
 }
+
+#[tauri::command]
+pub fn run_shell_command(command: String, cwd: String) -> Result<(), String> {
+    let resolved_cwd = app_manager::expand_and_validate_cwd(&cwd, "~");
+    app_manager::run_shell_in_ghostty(&command, &resolved_cwd)
+}

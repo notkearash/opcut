@@ -145,6 +145,7 @@ pub fn run() {
             commands::get_agent_config,
             commands::set_agent_config,
             commands::run_agent_query,
+            commands::run_shell_command,
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
