@@ -15,8 +15,8 @@
       {
         "label": "main",
         "title": "opcut",
-        "width": 368,
-        "height": 528,
+        "width": 640,
+        "height": 88,
         "visible": false,
         "decorations": false,
         "transparent": true,

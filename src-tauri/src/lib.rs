@@ -6,14 +6,12 @@ use config::SlotConfig;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    ActivationPolicy, AppHandle, Emitter, Manager, PhysicalPosition,
+    ActivationPolicy, AppHandle, Manager, PhysicalPosition,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
-
-struct TrayRect(Mutex<Option<(f64, f64, f64, f64)>>);
 
 #[cfg(target_os = "macos")]
 fn apply_macos_window_behavior(app: &AppHandle) {
@@ -37,22 +35,26 @@ fn apply_macos_window_behavior(app: &AppHandle) {
     }
 }
 
-fn position_near_tray(app: &AppHandle, window: &tauri::WebviewWindow) {
-    let tray_rect = app
-        .state::<TrayRect>()
-        .0
-        .lock()
+/// Place the window horizontally centered, with its top edge at ~1/4 of the screen height
+/// (Spotlight-style upper-third). Top-anchored so the window can grow downward without
+/// needing to reposition when results change.
+fn position_centered_upper_third(window: &tauri::WebviewWindow) {
+    let monitor = window
+        .current_monitor()
         .ok()
-        .and_then(|g| *g);
-    let Some((tx, ty, tw, _th)) = tray_rect else {
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let Some(mon) = monitor else {
         return;
     };
+    let mpos = mon.position();
+    let msize = mon.size();
     let Ok(ws) = window.outer_size() else {
         return;
     };
-    let x = tx + tw / 2.0 - ws.width as f64 / 2.0;
-    let y = ty;
-    let _ = window.set_position(PhysicalPosition::new(x, y));
+    let x = mpos.x + (msize.width as i32 - ws.width as i32) / 2;
+    let y = mpos.y + (msize.height as i32) / 4;
+    let _ = window.set_position(PhysicalPosition::new(x.max(mpos.x), y.max(mpos.y)));
 }
 
 fn toggle_main_window(app: &AppHandle) {
@@ -62,25 +64,10 @@ fn toggle_main_window(app: &AppHandle) {
     if window.is_visible().unwrap_or(false) {
         let _ = window.hide();
     } else {
-        position_near_tray(app, &window);
+        position_centered_upper_third(&window);
         let _ = window.show();
         let _ = window.set_focus();
     }
-}
-
-fn show_main_window(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("main") else {
-        return;
-    };
-    position_near_tray(app, &window);
-    let _ = window.show();
-    let _ = window.set_focus();
-}
-
-fn is_main_visible(app: &AppHandle) -> bool {
-    app.get_webview_window("main")
-        .and_then(|w| w.is_visible().ok())
-        .unwrap_or(false)
 }
 
 fn launch_slot(app: &AppHandle, slot_index: usize) {
@@ -96,7 +83,7 @@ fn launch_slot(app: &AppHandle, slot_index: usize) {
 }
 
 fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let toggle: Shortcut = "Alt+0".parse()?;
+    let toggle: Shortcut = "Alt+Space".parse()?;
     let h0 = app.clone();
     let held0 = Arc::new(AtomicBool::new(false));
     app.global_shortcut()
@@ -126,12 +113,7 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
                     if held.swap(true, Ordering::SeqCst) {
                         return;
                     }
-                    if is_main_visible(&h) {
-                        show_main_window(&h);
-                        let _ = h.emit("open-picker", i);
-                    } else {
-                        launch_slot(&h, i);
-                    }
+                    launch_slot(&h, i);
                 }
                 ShortcutState::Released => {
                     held.store(false, Ordering::SeqCst);
@@ -151,10 +133,12 @@ pub fn run() {
             commands::get_slot_config,
             commands::set_slot_config,
             commands::launch_or_focus_app,
+            commands::get_agent_config,
+            commands::set_agent_config,
+            commands::run_agent_query,
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
-            app.manage(TrayRect(Mutex::new(None)));
 
             let quit = MenuItem::with_id(app, "quit", "Quit opcut", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;
@@ -170,22 +154,6 @@ pub fn run() {
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
-                    let app = tray.app_handle();
-                    let rect = match &event {
-                        TrayIconEvent::Click { rect, .. }
-                        | TrayIconEvent::Enter { rect, .. }
-                        | TrayIconEvent::Leave { rect, .. }
-                        | TrayIconEvent::Move { rect, .. } => Some(rect.clone()),
-                        _ => None,
-                    };
-                    if let Some(rect) = rect {
-                        let pos = rect.position.to_physical::<f64>(1.0);
-                        let size = rect.size.to_physical::<f64>(1.0);
-                        if let Ok(mut g) = app.state::<TrayRect>().0.lock() {
-                            *g = Some((pos.x, pos.y, size.width, size.height));
-                        }
-                    }
-
                     if matches!(
                         event,
                         TrayIconEvent::Click {
@@ -194,7 +162,7 @@ pub fn run() {
                             ..
                         }
                     ) {
-                        toggle_main_window(app);
+                        toggle_main_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
