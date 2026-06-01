@@ -1,3 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap");
+
+:root {
+    /* Typography */
+    --font-display:
+        "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, system-ui,
+        sans-serif;
+    --font-mono:
+        ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+
+    /* Refined dark glass palette */
+    --panel: rgba(18, 18, 21, 0.66);
+    --panel-edge: rgba(255, 255, 255, 0.1);
+    --panel-edge-top: rgba(255, 255, 255, 0.16);
+    --hairline: rgba(255, 255, 255, 0.07);
+
+    --text: rgba(246, 246, 248, 0.96);
+    --text-dim: rgba(236, 236, 242, 0.5);
+    --text-faint: rgba(236, 236, 242, 0.28);
+
+    /* Monochrome accent — pure light on deep black */
+    --accent: #f6f6f8;
+    --accent-rgb: 246, 246, 248;
+    --sel-bg: rgba(var(--accent-rgb), 0.1);
+    --sel-edge: rgba(var(--accent-rgb), 0.22);
+
+    --radius-panel: 16px;
+    --radius-row: 10px;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -7,13 +37,13 @@
 html,
 body {
     background: transparent;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-        system-ui, sans-serif;
+    font-family: var(--font-display);
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--text);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     user-select: none;
+    cursor: default;
     overflow: hidden;
 }
 
@@ -21,4 +51,18 @@ body {
     width: 100%;
     height: 100vh;
     background: transparent;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.24);
 }
