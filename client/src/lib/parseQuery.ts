@@ -28,6 +28,27 @@ export function parseQuery(raw: string, ctx: ParseContext): ParsedQuery {
     return { kind: "command-menu", partial: s.slice(1).trim().toLowerCase() };
   }
 
+  // Shell prefix — "! <command>" runs a shell command in a terminal.
+  if (s[0] === "!") {
+    let rest = s.slice(1).trim();
+
+    let cwd = ctx.defaultCwd;
+    let cwdSource: "inline" | "default" = "default";
+    const cwdMatch = rest.match(CWD_MARKER);
+    if (cwdMatch) {
+      cwd = cwdMatch[1];
+      cwdSource = "inline";
+      rest = rest.slice(0, cwdMatch.index).trim();
+    }
+
+    return {
+      kind: "shell",
+      command: rest,
+      cwd: expandTilde(cwd, ctx.homeDir),
+      cwdSource,
+    };
+  }
+
   // Agent prefixes — "?" lists agents; "?oc <task>" runs one.
   if (s[0] === "?") {
     const sp = s.indexOf(" ");

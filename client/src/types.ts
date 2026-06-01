@@ -25,7 +25,7 @@ export interface AgentConfig {
   use_cd_fallback: boolean;
 }
 
-export type ResultKind = "app" | "agent" | "slot" | "command";
+export type ResultKind = "app" | "agent" | "slot" | "command" | "shell";
 
 export interface ResultRow {
   kind: ResultKind;
@@ -50,5 +50,11 @@ export type ParsedQuery =
     }
   | { kind: "agent-menu"; partial: string }
   | { kind: "command-menu"; partial: string }
+  | {
+      kind: "shell";
+      command: string;
+      cwd: string;
+      cwdSource: "inline" | "default";
+    }
   | { kind: "apps"; text: string }
   | { kind: "empty" };

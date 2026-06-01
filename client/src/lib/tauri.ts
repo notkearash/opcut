@@ -18,3 +18,6 @@ export const setAgentConfig = (config: AgentConfig) =>
 
 export const runAgentQuery = (agentId: string, prompt: string, cwd: string) =>
   invoke<void>("run_agent_query", { agentId, prompt, cwd });
+
+export const runShellCommand = (command: string, cwd: string) =>
+  invoke<void>("run_shell_command", { command, cwd });
