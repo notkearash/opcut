@@ -1,18 +1,25 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
 import type { AgentConfig, AppConfig, AppInfo } from "../types";
 import {
   getAgentConfig,
   getInstalledApps,
   getSlotConfig,
+  getSlotShortcutsEnabled,
+  setSlotShortcutsEnabled,
 } from "../lib/tauri";
 
 export interface AppData {
   apps: AppInfo[];
+  refreshApps: () => Promise<void>;
   slots: (AppConfig | null)[];
   setSlots: (slots: (AppConfig | null)[]) => void;
   agentConfig: AgentConfig | null;
   home: string;
+  /** Whether the global ⌥1–9 quick-slot shortcuts are active. */
+  slotShortcutsEnabled: boolean;
+  /** Toggle ⌥1–9 on/off, persisting and (un)registering the global hotkeys. */
+  toggleSlotShortcuts: () => Promise<void>;
 }
 
 /** Loads installed apps, slot config, agent config and the home dir once on mount. */
@@ -21,13 +28,33 @@ export function useAppData(): AppData {
   const [slots, setSlots] = useState<(AppConfig | null)[]>(Array(9).fill(null));
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
   const [home, setHome] = useState("~");
+  const [slotShortcutsEnabled, setSlotShortcutsEnabledState] = useState(true);
+
+  // Re-scan installed apps. Cheap (a directory walk), so it's safe to call on
+  // every window show to pick up newly installed/removed apps.
+  const refreshApps = useCallback(() => getInstalledApps().then(setApps), []);
+
+  const toggleSlotShortcuts = useCallback(async () => {
+    const next = await setSlotShortcutsEnabled(!slotShortcutsEnabled);
+    setSlotShortcutsEnabledState(next);
+  }, [slotShortcutsEnabled]);
 
   useEffect(() => {
-    getInstalledApps().then(setApps);
+    refreshApps();
     getSlotConfig().then((c) => setSlots(c.slots));
     getAgentConfig().then(setAgentConfig);
+    getSlotShortcutsEnabled().then(setSlotShortcutsEnabledState);
     homeDir().then((h) => setHome(h.replace(/\/$/, "")));
-  }, []);
+  }, [refreshApps]);
 
-  return { apps, slots, setSlots, agentConfig, home };
+  return {
+    apps,
+    refreshApps,
+    slots,
+    setSlots,
+    agentConfig,
+    home,
+    slotShortcutsEnabled,
+    toggleSlotShortcuts,
+  };
 }

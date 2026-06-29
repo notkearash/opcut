@@ -82,7 +82,21 @@ fn launch_slot(app: &AppHandle, slot_index: usize) {
     }
 }
 
-fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+const SLOT_SHORTCUT_KEYS: [&str; 9] = [
+    "Alt+1", "Alt+2", "Alt+3", "Alt+4", "Alt+5", "Alt+6", "Alt+7", "Alt+8", "Alt+9",
+];
+
+/// Whether the ⌥1–9 quick-slot shortcuts are enabled (stored flag, default on).
+pub(crate) fn slot_shortcuts_enabled(app: &AppHandle) -> bool {
+    let store = app.store("config.json").expect("failed to access store");
+    store
+        .get("slot_shortcuts_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+}
+
+/// Register the always-on ⌥Space launcher toggle.
+fn register_toggle_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let toggle: Shortcut = "Alt+Space".parse()?;
     let h0 = app.clone();
     let held0 = Arc::new(AtomicBool::new(false));
@@ -98,12 +112,12 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
                 held0.store(false, Ordering::SeqCst);
             }
         })?;
+    Ok(())
+}
 
-    let shortcut_keys = [
-        "Alt+1", "Alt+2", "Alt+3", "Alt+4", "Alt+5", "Alt+6", "Alt+7", "Alt+8", "Alt+9",
-    ];
-
-    for (i, key) in shortcut_keys.iter().enumerate() {
+/// Register the ⌥1–9 quick-slot shortcuts.
+pub(crate) fn register_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    for (i, key) in SLOT_SHORTCUT_KEYS.iter().enumerate() {
         let shortcut: Shortcut = key.parse()?;
         let h = app.clone();
         let held = Arc::new(AtomicBool::new(false));
@@ -132,6 +146,15 @@ fn register_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+/// Unregister the ⌥1–9 quick-slot shortcuts, releasing them back to the system.
+pub(crate) fn unregister_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    for key in SLOT_SHORTCUT_KEYS.iter() {
+        let shortcut: Shortcut = key.parse()?;
+        app.global_shortcut().unregister(shortcut)?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -146,6 +169,8 @@ pub fn run() {
             commands::set_agent_config,
             commands::run_agent_query,
             commands::run_shell_command,
+            commands::get_slot_shortcuts_enabled,
+            commands::set_slot_shortcuts_enabled,
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
@@ -177,7 +202,10 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            register_shortcuts(app.handle())?;
+            register_toggle_shortcut(app.handle())?;
+            if slot_shortcuts_enabled(app.handle()) {
+                register_slot_shortcuts(app.handle())?;
+            }
 
             #[cfg(target_os = "macos")]
             apply_macos_window_behavior(app.handle());

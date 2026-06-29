@@ -22,7 +22,16 @@ import "./App.css";
 type View = "search" | "settings";
 
 function App() {
-  const { apps, slots, setSlots, agentConfig, home } = useAppData();
+  const {
+    apps,
+    refreshApps,
+    slots,
+    setSlots,
+    agentConfig,
+    home,
+    slotShortcutsEnabled,
+    toggleSlotShortcuts,
+  } = useAppData();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>("search");
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
@@ -115,10 +124,32 @@ function App() {
     if (parsed.kind === "command-menu") {
       const commands = [
         {
+          id: "refresh",
+          title: "Refresh app list",
+          subtitle: "re-scan for newly installed apps",
+          run: () => {
+            refreshApps();
+            setQuery("");
+          },
+        },
+        {
           id: "slots",
           title: "Configure quick slots",
           subtitle: "assign apps to ⌥1–9",
           run: () => setView("settings"),
+        },
+        {
+          id: "shortcuts",
+          title: slotShortcutsEnabled
+            ? "Disable option shortcuts"
+            : "Enable option shortcuts",
+          subtitle: slotShortcutsEnabled
+            ? "turn off the global ⌥1–9 quick-slot hotkeys"
+            : "turn on the global ⌥1–9 quick-slot hotkeys",
+          run: () => {
+            toggleSlotShortcuts();
+            setQuery("");
+          },
         },
       ];
       return commands
@@ -161,7 +192,17 @@ function App() {
         subtitle: `⌥${i + 1}`,
         onActivate: () => launchOrFocusApp(app.path).finally(hideAndReset),
       }));
-  }, [parsed, apps, slots, home, hideAndReset, agentConfig]);
+  }, [
+    parsed,
+    apps,
+    slots,
+    home,
+    hideAndReset,
+    agentConfig,
+    refreshApps,
+    slotShortcutsEnabled,
+    toggleSlotShortcuts,
+  ]);
 
   const { selected, setSelected, onKeyDown } = useKeyboardNav(results, hideAndReset);
 
@@ -174,6 +215,8 @@ function App() {
         setView("search");
         setPickerSlot(null);
         inputRef.current?.focus();
+        // Re-scan apps on every show so newly installed apps appear without a restart.
+        refreshApps();
       } else {
         getCurrentWindow().hide();
         setQuery("");
@@ -184,7 +227,7 @@ function App() {
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [refreshApps]);
 
   // Global ⌥1–9 while the window is open: Rust emits `assign-slot` (it can't
   // reach the webview as a keystroke). Jump into settings with that slot's picker.

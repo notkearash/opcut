@@ -104,6 +104,29 @@ pub fn run_agent_query(
 }
 
 #[tauri::command]
+pub fn get_slot_shortcuts_enabled(app_handle: tauri::AppHandle) -> bool {
+    crate::slot_shortcuts_enabled(&app_handle)
+}
+
+#[tauri::command]
+pub fn set_slot_shortcuts_enabled(
+    app_handle: tauri::AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    let store = app_handle
+        .store("config.json")
+        .expect("failed to access store");
+    store.set("slot_shortcuts_enabled", serde_json::json!(enabled));
+
+    if enabled {
+        crate::register_slot_shortcuts(&app_handle).map_err(|e| e.to_string())?;
+    } else {
+        crate::unregister_slot_shortcuts(&app_handle).map_err(|e| e.to_string())?;
+    }
+    Ok(enabled)
+}
+
+#[tauri::command]
 pub fn run_shell_command(command: String, cwd: String) -> Result<(), String> {
     let resolved_cwd = app_manager::expand_and_validate_cwd(&cwd, "~");
     app_manager::run_shell_in_ghostty(&command, &resolved_cwd)

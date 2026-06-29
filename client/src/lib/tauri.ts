@@ -21,3 +21,9 @@ export const runAgentQuery = (agentId: string, prompt: string, cwd: string) =>
 
 export const runShellCommand = (command: string, cwd: string) =>
   invoke<void>("run_shell_command", { command, cwd });
+
+export const getSlotShortcutsEnabled = () =>
+  invoke<boolean>("get_slot_shortcuts_enabled");
+
+export const setSlotShortcutsEnabled = (enabled: boolean) =>
+  invoke<boolean>("set_slot_shortcuts_enabled", { enabled });
