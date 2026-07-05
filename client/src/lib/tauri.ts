@@ -3,6 +3,8 @@ import type { AgentConfig, AppInfo, AppConfig, SlotConfig } from "../types";
 
 export const getInstalledApps = () => invoke<AppInfo[]>("get_installed_apps");
 
+export const getRunningApps = () => invoke<AppInfo[]>("get_running_apps");
+
 export const getSlotConfig = () => invoke<SlotConfig>("get_slot_config");
 
 export const setSlotConfig = (slotIndex: number, appConfig: AppConfig | null) =>

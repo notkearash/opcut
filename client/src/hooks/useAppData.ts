@@ -4,6 +4,7 @@ import type { AgentConfig, AppConfig, AppInfo } from "../types";
 import {
   getAgentConfig,
   getInstalledApps,
+  getRunningApps,
   getSlotConfig,
   getSlotShortcutsEnabled,
   setSlotShortcutsEnabled,
@@ -11,6 +12,7 @@ import {
 
 export interface AppData {
   apps: AppInfo[];
+  runningApps: AppInfo[];
   refreshApps: () => Promise<void>;
   slots: (AppConfig | null)[];
   setSlots: (slots: (AppConfig | null)[]) => void;
@@ -25,6 +27,7 @@ export interface AppData {
 /** Loads installed apps, slot config, agent config and the home dir once on mount. */
 export function useAppData(): AppData {
   const [apps, setApps] = useState<AppInfo[]>([]);
+  const [runningApps, setRunningApps] = useState<AppInfo[]>([]);
   const [slots, setSlots] = useState<(AppConfig | null)[]>(Array(9).fill(null));
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
   const [home, setHome] = useState("~");
@@ -32,7 +35,14 @@ export function useAppData(): AppData {
 
   // Re-scan installed apps. Cheap (a directory walk), so it's safe to call on
   // every window show to pick up newly installed/removed apps.
-  const refreshApps = useCallback(() => getInstalledApps().then(setApps), []);
+  const refreshApps = useCallback(
+    () =>
+      Promise.all([
+        getInstalledApps().then(setApps),
+        getRunningApps().then(setRunningApps),
+      ]).then(() => undefined),
+    [],
+  );
 
   const toggleSlotShortcuts = useCallback(async () => {
     const next = await setSlotShortcutsEnabled(!slotShortcutsEnabled);
@@ -49,6 +59,7 @@ export function useAppData(): AppData {
 
   return {
     apps,
+    runningApps,
     refreshApps,
     slots,
     setSlots,

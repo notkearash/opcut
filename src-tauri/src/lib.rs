@@ -3,13 +3,13 @@ mod commands;
 mod config;
 
 use config::SlotConfig;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     ActivationPolicy, AppHandle, Emitter, Manager, PhysicalPosition,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
@@ -122,24 +122,26 @@ pub(crate) fn register_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std
         let h = app.clone();
         let held = Arc::new(AtomicBool::new(false));
         app.global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, event| match event.state() {
-                ShortcutState::Pressed => {
-                    if held.swap(true, Ordering::SeqCst) {
-                        return;
+            .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                match event.state() {
+                    ShortcutState::Pressed => {
+                        if held.swap(true, Ordering::SeqCst) {
+                            return;
+                        }
+                        // Window open → ⌥N assigns that slot; window hidden → ⌥N launches it.
+                        let visible = h
+                            .get_webview_window("main")
+                            .and_then(|w| w.is_visible().ok())
+                            .unwrap_or(false);
+                        if visible {
+                            let _ = h.emit("assign-slot", i);
+                        } else {
+                            launch_slot(&h, i);
+                        }
                     }
-                    // Window open → ⌥N assigns that slot; window hidden → ⌥N launches it.
-                    let visible = h
-                        .get_webview_window("main")
-                        .and_then(|w| w.is_visible().ok())
-                        .unwrap_or(false);
-                    if visible {
-                        let _ = h.emit("assign-slot", i);
-                    } else {
-                        launch_slot(&h, i);
+                    ShortcutState::Released => {
+                        held.store(false, Ordering::SeqCst);
                     }
-                }
-                ShortcutState::Released => {
-                    held.store(false, Ordering::SeqCst);
                 }
             })?;
     }
@@ -162,6 +164,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::get_installed_apps,
+            commands::get_running_apps,
             commands::get_slot_config,
             commands::set_slot_config,
             commands::launch_or_focus_app,

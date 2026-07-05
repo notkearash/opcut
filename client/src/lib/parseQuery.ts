@@ -28,6 +28,11 @@ export function parseQuery(raw: string, ctx: ParseContext): ParsedQuery {
     return { kind: "command-menu", partial: s.slice(1).trim().toLowerCase() };
   }
 
+  // Running-app search — "* …" lists apps that are already open.
+  if (s[0] === "*") {
+    return { kind: "running-apps", text: s.slice(1).trim() };
+  }
+
   // Shell prefix — "! <command>" runs a shell command in a terminal.
   if (s[0] === "!") {
     let rest = s.slice(1).trim();

@@ -24,6 +24,7 @@ type View = "search" | "settings";
 function App() {
   const {
     apps,
+    runningApps,
     refreshApps,
     slots,
     setSlots,
@@ -180,6 +181,18 @@ function App() {
         }));
     }
 
+    if (parsed.kind === "running-apps") {
+      return fuzzySearch(parsed.text, runningApps, (a) => a.name)
+        .slice(0, MAX_VISIBLE)
+        .map((m) => ({
+          kind: "app" as const,
+          id: `running-${m.item.path}`,
+          title: m.item.name,
+          matchIndices: m.indices,
+          onActivate: () => launchOrFocusApp(m.item.path).finally(hideAndReset),
+        }));
+    }
+
     // empty query → assigned quick slots
     return slots
       .map((app, i) => ({ app, i }))
@@ -195,6 +208,7 @@ function App() {
   }, [
     parsed,
     apps,
+    runningApps,
     slots,
     home,
     hideAndReset,
@@ -308,7 +322,11 @@ function App() {
         <>
           <div className="divider" />
           <div className="empty-state">
-            {parsed.kind === "apps" ? "No matching apps" : "No results"}
+            {parsed.kind === "apps"
+              ? "No matching apps"
+              : parsed.kind === "running-apps"
+                ? "No matching open apps"
+                : "No results"}
           </div>
           <Footer count={0} />
         </>

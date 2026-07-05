@@ -50,6 +50,7 @@ export type ParsedQuery =
     }
   | { kind: "agent-menu"; partial: string }
   | { kind: "command-menu"; partial: string }
+  | { kind: "running-apps"; text: string }
   | {
       kind: "shell";
       command: string;

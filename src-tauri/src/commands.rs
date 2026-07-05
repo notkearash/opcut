@@ -8,6 +8,11 @@ pub fn get_installed_apps() -> Vec<AppInfo> {
 }
 
 #[tauri::command]
+pub fn get_running_apps() -> Vec<AppInfo> {
+    app_manager::list_running_apps()
+}
+
+#[tauri::command]
 pub fn get_slot_config(app_handle: tauri::AppHandle) -> SlotConfig {
     let store = app_handle
         .store("config.json")
