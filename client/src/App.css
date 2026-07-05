@@ -235,6 +235,17 @@
 .result-item[data-kind="app"] .result-title {
     color: var(--text-dim);
 }
+.result-item[data-status="terminating"] .result-title {
+    color: var(--text-dim);
+}
+.result-item[data-status="terminated"] .result-title {
+    color: var(--live);
+    font-weight: 650;
+}
+.result-item[data-status="failed"] .result-title {
+    color: var(--kill);
+    font-weight: 650;
+}
 .result-title .hl {
     background: transparent;
     color: var(--text);
@@ -271,6 +282,120 @@
     font-size: 11px;
     letter-spacing: -0.5px;
 }
+/* ── Quit flow: the row powers down ─────────────────────────────────── */
+/* Widen the trailing slot so the ⇧⌫ hint and status orb fit cleanly. */
+.result-item .result-enter {
+    min-width: 18px;
+    width: auto;
+}
+
+/* Inline "hold ⇧⌫ to quit" affordance on the selected running-app row. */
+.kill-hint {
+    display: inline-flex;
+}
+.kill-hint kbd {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--kill);
+    background: rgba(var(--kill-rgb), 0.1);
+    border: 1px solid rgba(var(--kill-rgb), 0.28);
+    border-radius: 5px;
+    padding: 2px 5px;
+    line-height: 1;
+}
+
+/* Status orb: pulsing while the quit is in flight, resolves to ✓ / ✕. */
+.kill-orb {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+.kill-orb[data-status="terminating"] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), 0.5);
+    animation: kill-pulse 0.9s ease-in-out infinite;
+}
+.kill-orb[data-status="terminated"] {
+    background: rgba(var(--live-rgb), 0.16);
+    color: var(--live);
+    box-shadow: inset 0 0 0 1px rgba(var(--live-rgb), 0.4);
+}
+.kill-orb[data-status="terminated"]::before {
+    content: "✓";
+}
+.kill-orb[data-status="failed"] {
+    background: rgba(var(--kill-rgb), 0.16);
+    color: var(--kill);
+    box-shadow: inset 0 0 0 1px rgba(var(--kill-rgb), 0.4);
+}
+.kill-orb[data-status="failed"]::before {
+    content: "✕";
+}
+
+@keyframes kill-pulse {
+    0%,
+    100% {
+        box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), 0.22);
+        transform: scale(0.82);
+    }
+    50% {
+        box-shadow: inset 0 0 0 1.5px rgba(var(--accent-rgb), 0.7);
+        transform: scale(1);
+    }
+}
+
+/* The whole row reacts: fade+collapse on a clean quit, a short shake on refusal. */
+.result-item[data-status="terminated"] {
+    animation: kill-powerdown 1.5s ease forwards;
+}
+.result-item[data-status="failed"] {
+    animation: kill-refuse 0.4s ease;
+}
+@keyframes kill-powerdown {
+    0% {
+        opacity: 1;
+    }
+    62% {
+        opacity: 1;
+        filter: none;
+    }
+    100% {
+        opacity: 0.35;
+        filter: saturate(0.4);
+    }
+}
+@keyframes kill-refuse {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    20% {
+        transform: translateX(-4px);
+    }
+    45% {
+        transform: translateX(3px);
+    }
+    70% {
+        transform: translateX(-2px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kill-orb[data-status="terminating"],
+    .result-item[data-status="terminated"],
+    .result-item[data-status="failed"] {
+        animation: none;
+    }
+    .result-item[data-status="terminated"] {
+        opacity: 0.5;
+    }
+}
 
 /* ── Footer ─────────────────────────────────────────────────────────── */
 .footer {
@@ -299,6 +424,19 @@
     border-radius: 5px;
     padding: 1px 5px;
     margin: 0 1px;
+}
+.footer .kbd-kill {
+    color: var(--kill);
+    background: rgba(var(--kill-rgb), 0.1);
+    border-color: rgba(var(--kill-rgb), 0.28);
+}
+.footer-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ── Empty state ────────────────────────────────────────────────────── */

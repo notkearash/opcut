@@ -30,6 +30,12 @@
     --ai-pink: #ff7ab8;
     --ai-pink-rgb: 255, 122, 184;
 
+    /* Quit lifecycle — surfaces only while the `*` running-apps kill flow runs */
+    --live: #6ee7a8; /* app quit cleanly */
+    --live-rgb: 110, 231, 168;
+    --kill: #ff8a8a; /* app declined to quit */
+    --kill-rgb: 255, 138, 138;
+
     --radius-panel: 16px;
     --radius-row: 10px;
 }

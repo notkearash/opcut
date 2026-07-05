@@ -2,12 +2,17 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { LogicalSize } from "@tauri-apps/api/dpi";
-import type { ResultRow } from "./types";
+import type { AppInfo, ResultRow } from "./types";
 import { useAppData } from "./hooks/useAppData";
 import { useKeyboardNav } from "./hooks/useKeyboardNav";
 import { parseQuery } from "./lib/parseQuery";
 import { fuzzySearch } from "./lib/fuzzy";
-import { launchOrFocusApp, runAgentQuery, runShellCommand } from "./lib/tauri";
+import {
+  launchOrFocusApp,
+  runAgentQuery,
+  runShellCommand,
+  terminateRunningApp,
+} from "./lib/tauri";
 import {
   MAX_VISIBLE,
   WIN_W,
@@ -20,6 +25,20 @@ import SettingsView from "./components/SettingsView";
 import "./App.css";
 
 type View = "search" | "settings";
+type KillStatus = "terminating" | "terminated" | "failed";
+
+function killTitle(status?: KillStatus) {
+  if (status === "terminating") return "Terminating...";
+  if (status === "terminated") return "Terminated";
+  if (status === "failed") return "Could not quit";
+  return undefined;
+}
+
+function removeKillState(state: Record<string, KillStatus>, path: string) {
+  const next = { ...state };
+  delete next[path];
+  return next;
+}
 
 function App() {
   const {
@@ -36,14 +55,46 @@ function App() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>("search");
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
+  const [killStateByPath, setKillStateByPath] = useState<Record<string, KillStatus>>({});
+  const [hiddenRunningAppPaths, setHiddenRunningAppPaths] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const resetKillUi = useCallback(() => {
+    setKillStateByPath({});
+    setHiddenRunningAppPaths([]);
+  }, []);
 
   const hideAndReset = useCallback(() => {
     getCurrentWindow().hide();
     setQuery("");
     setView("search");
     setPickerSlot(null);
-  }, []);
+    resetKillUi();
+  }, [resetKillUi]);
+
+  const killRunningApp = useCallback(
+    async (app: AppInfo) => {
+      setKillStateByPath((state) => ({ ...state, [app.path]: "terminating" }));
+      try {
+        await terminateRunningApp(app.path);
+        setKillStateByPath((state) => ({ ...state, [app.path]: "terminated" }));
+        window.setTimeout(() => {
+          setHiddenRunningAppPaths((paths) =>
+            paths.includes(app.path) ? paths : [...paths, app.path],
+          );
+          setKillStateByPath((state) => removeKillState(state, app.path));
+          refreshApps();
+        }, 1500);
+      } catch {
+        setKillStateByPath((state) => ({ ...state, [app.path]: "failed" }));
+        window.setTimeout(() => {
+          setKillStateByPath((state) => removeKillState(state, app.path));
+          refreshApps();
+        }, 2600);
+      }
+    },
+    [refreshApps],
+  );
 
   // --- query parsing & result building -------------------------------------
   const parsed = useMemo(
@@ -183,14 +234,24 @@ function App() {
 
     if (parsed.kind === "running-apps") {
       return fuzzySearch(parsed.text, runningApps, (a) => a.name)
+        .filter((m) => !hiddenRunningAppPaths.includes(m.item.path))
         .slice(0, MAX_VISIBLE)
-        .map((m) => ({
-          kind: "app" as const,
-          id: `running-${m.item.path}`,
-          title: m.item.name,
-          matchIndices: m.indices,
-          onActivate: () => launchOrFocusApp(m.item.path).finally(hideAndReset),
-        }));
+        .map((m) => {
+          const status = killStateByPath[m.item.path];
+          return {
+            kind: "app" as const,
+            id: `running-${m.item.path}`,
+            title: killTitle(status) ?? m.item.name,
+            subtitle: status ? m.item.name : undefined,
+            matchIndices: status ? undefined : m.indices,
+            status,
+            onActivate: status
+              ? () => {}
+              : () => launchOrFocusApp(m.item.path).finally(hideAndReset),
+            onKill:
+              status === undefined ? () => killRunningApp(m.item) : undefined,
+          };
+        });
     }
 
     // empty query → assigned quick slots
@@ -209,9 +270,12 @@ function App() {
     parsed,
     apps,
     runningApps,
+    hiddenRunningAppPaths,
+    killStateByPath,
     slots,
     home,
     hideAndReset,
+    killRunningApp,
     agentConfig,
     refreshApps,
     slotShortcutsEnabled,
@@ -231,17 +295,19 @@ function App() {
         inputRef.current?.focus();
         // Re-scan apps on every show so newly installed apps appear without a restart.
         refreshApps();
+        resetKillUi();
       } else {
         getCurrentWindow().hide();
         setQuery("");
         setView("search");
         setPickerSlot(null);
+        resetKillUi();
       }
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [refreshApps]);
+  }, [refreshApps, resetKillUi]);
 
   // Global ⌥1–9 while the window is open: Rust emits `assign-slot` (it can't
   // reach the webview as a keystroke). Jump into settings with that slot's picker.
@@ -298,6 +364,7 @@ function App() {
   const aiActive = parsed.kind === "agent" || parsed.kind === "agent-menu";
   const shellActive = parsed.kind === "shell";
   const hasQuery = query.trim().length > 0;
+  const killHint = parsed.kind === "running-apps" && results.length > 0;
 
   return (
     <div className="shell">
@@ -315,7 +382,7 @@ function App() {
         <>
           <div className="divider" />
           <ResultList rows={results} selected={selected} onHover={setSelected} />
-          <Footer count={results.length} />
+          <Footer count={results.length} killHint={killHint} />
         </>
       )}
       {results.length === 0 && hasQuery && (
@@ -328,21 +395,35 @@ function App() {
                 ? "No matching open apps"
                 : "No results"}
           </div>
-          <Footer count={0} />
+          <Footer count={0} killHint={killHint} />
         </>
       )}
     </div>
   );
 }
 
-function Footer({ count }: { count: number }) {
+function Footer({ count, killHint }: { count: number; killHint: boolean }) {
   return (
     <div className="footer">
       <span className="footer-left">
-        {count > 0 ? `${count} result${count === 1 ? "" : "s"}` : ""}
+        {killHint ? (
+          <span className="footer-note">
+            <kbd className="kbd-kill">⇧⌫</kbd> asks the app to quit, like ⌘Q
+          </span>
+        ) : count > 0 ? (
+          `${count} result${count === 1 ? "" : "s"}`
+        ) : (
+          ""
+        )}
       </span>
       <span className="footer-keys">
-        <kbd>↑↓</kbd> navigate <kbd>↵</kbd> open <kbd>esc</kbd> dismiss
+        <kbd>↑↓</kbd> navigate <kbd>↵</kbd> {killHint ? "focus" : "open"}{" "}
+        {killHint && (
+          <>
+            <kbd className="kbd-kill">⇧⌫</kbd> quit{" "}
+          </>
+        )}
+        <kbd>esc</kbd> dismiss
       </span>
     </div>
   );

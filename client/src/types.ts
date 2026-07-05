@@ -36,7 +36,9 @@ export interface ResultRow {
   matchIndices?: number[];
   /** Glyph/badge shown at the leading edge (e.g. slot number, agent id). */
   badge?: string;
+  status?: "terminating" | "terminated" | "failed";
   onActivate: () => void | Promise<void>;
+  onKill?: () => void | Promise<void>;
 }
 
 export type ParsedQuery =

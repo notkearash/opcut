@@ -13,6 +13,9 @@ export const setSlotConfig = (slotIndex: number, appConfig: AppConfig | null) =>
 export const launchOrFocusApp = (path: string) =>
   invoke<void>("launch_or_focus_app", { path });
 
+export const terminateRunningApp = (path: string) =>
+  invoke<void>("terminate_running_app", { path });
+
 export const getAgentConfig = () => invoke<AgentConfig>("get_agent_config");
 
 export const setAgentConfig = (config: AgentConfig) =>

@@ -54,6 +54,11 @@ pub fn launch_or_focus_app(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn terminate_running_app(path: String) -> Result<(), String> {
+    app_manager::terminate_running_app(&path)
+}
+
+#[tauri::command]
 pub fn get_agent_config(app_handle: tauri::AppHandle) -> AgentConfig {
     let store = app_handle
         .store("config.json")

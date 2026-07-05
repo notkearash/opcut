@@ -32,6 +32,7 @@ export default function ResultItem({
     <button
       className={`result-item ${selected ? "selected" : ""}`}
       data-kind={row.kind}
+      data-status={row.status ?? ""}
       onMouseMove={onHover}
       onClick={onActivate}
     >
@@ -40,7 +41,19 @@ export default function ResultItem({
         <span className="result-title">{highlight(row.title, row.matchIndices)}</span>
         {row.subtitle && <span className="result-subtitle">{row.subtitle}</span>}
       </span>
-      <span className="result-enter">{selected ? "↵" : ""}</span>
+      <span className="result-enter">
+        {row.status ? (
+          <span className="kill-orb" data-status={row.status} aria-hidden />
+        ) : selected && row.onKill ? (
+          <span className="kill-hint">
+            <kbd>⇧⌫</kbd>
+          </span>
+        ) : selected ? (
+          "↵"
+        ) : (
+          ""
+        )}
+      </span>
     </button>
   );
 }

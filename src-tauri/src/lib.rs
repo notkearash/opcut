@@ -168,6 +168,7 @@ pub fn run() {
             commands::get_slot_config,
             commands::set_slot_config,
             commands::launch_or_focus_app,
+            commands::terminate_running_app,
             commands::get_agent_config,
             commands::set_agent_config,
             commands::run_agent_query,

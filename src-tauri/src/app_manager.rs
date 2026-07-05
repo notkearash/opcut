@@ -87,6 +87,56 @@ pub fn list_running_apps() -> Vec<AppInfo> {
     Vec::new()
 }
 
+#[cfg(target_os = "macos")]
+pub fn terminate_running_app(path: &str) -> Result<(), String> {
+    use objc2::rc::autoreleasepool;
+    use objc2_app_kit::{NSApplicationActivationPolicy, NSWorkspace};
+
+    autoreleasepool(|_| {
+        let workspace = unsafe { NSWorkspace::sharedWorkspace() };
+        let running_apps = unsafe { workspace.runningApplications() };
+
+        for i in 0..running_apps.len() {
+            let Some(app) = running_apps.get(i) else {
+                continue;
+            };
+            if unsafe { app.isTerminated() }
+                || unsafe { app.activationPolicy() } != NSApplicationActivationPolicy::Regular
+            {
+                continue;
+            }
+
+            let Some(bundle_url) = (unsafe { app.bundleURL() }) else {
+                continue;
+            };
+            let Some(bundle_path) = (unsafe { bundle_url.path() }) else {
+                continue;
+            };
+            if bundle_path.to_string() != path {
+                continue;
+            }
+
+            // `terminate()` posts an async quit request (like ⌘Q) and returns
+            // whether the request was accepted. We must NOT block the main thread
+            // waiting for it to finish — this command runs on the main thread, and
+            // sleeping here freezes the run loop (so `isTerminated` never updates
+            // and the whole UI hangs). Fire the request and return; the frontend
+            // reconciles via `refreshApps`.
+            if unsafe { app.terminate() } {
+                return Ok(());
+            }
+            return Err("App declined to quit".to_string());
+        }
+
+        Err("App is not running".to_string())
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn terminate_running_app(_path: &str) -> Result<(), String> {
+    Err("Quitting running apps is only supported on macOS".to_string())
+}
+
 pub fn launch_or_focus_app(path: &str) -> Result<(), String> {
     Command::new("open")
         .arg("-a")

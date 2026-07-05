@@ -35,6 +35,13 @@ export function useKeyboardNav(
       } else if (e.key === "Enter") {
         e.preventDefault();
         results[selected]?.onActivate();
+      } else if (
+        e.shiftKey &&
+        (e.key === "Delete" || e.key === "Backspace") &&
+        results[selected]?.onKill
+      ) {
+        e.preventDefault();
+        results[selected].onKill?.();
       } else if (e.key === "Escape") {
         e.preventDefault();
         onEscape();
