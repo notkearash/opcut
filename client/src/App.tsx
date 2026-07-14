@@ -16,7 +16,6 @@ import {
   terminateRunningApp,
 } from "./lib/tauri";
 import {
-  MAX_VISIBLE,
   WIN_W,
   settingsWindowHeight,
   windowHeight,
@@ -275,7 +274,6 @@ function App() {
 
     if (parsed.kind === "apps") {
       return fuzzySearch(parsed.text, apps, (a) => a.name)
-        .slice(0, MAX_VISIBLE)
         .map((m) => ({
           kind: "app" as const,
           id: m.item.path,
@@ -288,7 +286,6 @@ function App() {
     if (parsed.kind === "running-apps") {
       return fuzzySearch(parsed.text, runningApps, (a) => a.name)
         .filter((m) => !hiddenRunningAppPaths.includes(m.item.path))
-        .slice(0, MAX_VISIBLE)
         .map((m) => {
           const status = killStateByPath[m.item.path];
           return {
