@@ -1,6 +1,7 @@
 mod app_manager;
 mod commands;
 mod config;
+mod gesture;
 
 use config::SlotConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -119,6 +120,32 @@ fn main_window_visible(app: &AppHandle) -> bool {
     }
 }
 
+/// Open the launcher directly in the running-app route. Unlike the regular launcher
+/// shortcut, invoking the gesture while the panel is already visible does not hide it.
+pub(crate) fn show_running_apps(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_nspanel::ManagerExt;
+
+        if let Some(window) = app.get_webview_window("main") {
+            position_centered_upper_third(&window);
+        }
+        if let Ok(panel) = app.get_webview_panel("main") {
+            panel.show();
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            position_centered_upper_third(&window);
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+
+    let _ = app.emit("show-running-apps", ());
+}
+
 fn launch_slot(app: &AppHandle, slot_index: usize) {
     let store = app.store("config.json").expect("failed to access store");
     let config: SlotConfig = store
@@ -226,6 +253,8 @@ pub fn run() {
             commands::run_shell_command,
             commands::get_slot_shortcuts_enabled,
             commands::set_slot_shortcuts_enabled,
+            commands::get_three_finger_app_switcher_enabled,
+            commands::set_three_finger_app_switcher_enabled,
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
@@ -264,6 +293,8 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             convert_main_to_panel(app.handle());
+
+            gesture::register_monitor(app.handle())?;
 
             Ok(())
         })

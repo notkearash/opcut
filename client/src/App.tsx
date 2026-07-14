@@ -51,6 +51,8 @@ function App() {
     home,
     slotShortcutsEnabled,
     toggleSlotShortcuts,
+    threeFingerAppSwitcherEnabled,
+    toggleThreeFingerAppSwitcher,
   } = useAppData();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>("search");
@@ -58,6 +60,7 @@ function App() {
   const [killStateByPath, setKillStateByPath] = useState<Record<string, KillStatus>>({});
   const [hiddenRunningAppPaths, setHiddenRunningAppPaths] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const gestureOpenPending = useRef(false);
 
   const resetKillUi = useCallback(() => {
     setKillStateByPath({});
@@ -203,6 +206,19 @@ function App() {
             setQuery("");
           },
         },
+        {
+          id: "gesture",
+          title: threeFingerAppSwitcherEnabled
+            ? "Disable three-finger app switcher"
+            : "Enable three-finger app switcher",
+          subtitle: threeFingerAppSwitcherEnabled
+            ? "restore your previous macOS vertical swipe gestures"
+            : "three fingers opens * apps · macOS overview moves to four",
+          run: () => {
+            toggleThreeFingerAppSwitcher();
+            setQuery("");
+          },
+        },
       ];
       return commands
         .filter(
@@ -280,6 +296,8 @@ function App() {
     refreshApps,
     slotShortcutsEnabled,
     toggleSlotShortcuts,
+    threeFingerAppSwitcherEnabled,
+    toggleThreeFingerAppSwitcher,
   ]);
 
   const { selected, setSelected, onKeyDown } = useKeyboardNav(results, hideAndReset);
@@ -289,7 +307,11 @@ function App() {
   useEffect(() => {
     const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
       if (focused) {
-        setQuery("");
+        if (gestureOpenPending.current) {
+          gestureOpenPending.current = false;
+        } else {
+          setQuery("");
+        }
         setView("search");
         setPickerSlot(null);
         inputRef.current?.focus();
@@ -297,12 +319,30 @@ function App() {
         refreshApps();
         resetKillUi();
       } else {
+        gestureOpenPending.current = false;
         getCurrentWindow().hide();
         setQuery("");
         setView("search");
         setPickerSlot(null);
         resetKillUi();
       }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [refreshApps, resetKillUi]);
+
+  // The native trackpad monitor opens the panel and requests the existing `*` route.
+  // The pending ref makes this resilient to either focus/event delivery order.
+  useEffect(() => {
+    const unlisten = listen("show-running-apps", () => {
+      gestureOpenPending.current = true;
+      setQuery("* ");
+      setView("search");
+      setPickerSlot(null);
+      resetKillUi();
+      refreshApps();
+      inputRef.current?.focus();
     });
     return () => {
       unlisten.then((fn) => fn());

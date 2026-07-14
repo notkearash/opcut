@@ -7,6 +7,8 @@ import {
   getRunningApps,
   getSlotConfig,
   getSlotShortcutsEnabled,
+  getThreeFingerAppSwitcherEnabled,
+  setThreeFingerAppSwitcherEnabled,
   setSlotShortcutsEnabled,
 } from "../lib/tauri";
 
@@ -22,6 +24,10 @@ export interface AppData {
   slotShortcutsEnabled: boolean;
   /** Toggle ⌥1–9 on/off, persisting and (un)registering the global hotkeys. */
   toggleSlotShortcuts: () => Promise<void>;
+  /** Whether a vertical three-finger swipe opens the running-app menu. */
+  threeFingerAppSwitcherEnabled: boolean;
+  /** Toggle the persisted three-finger running-app gesture. */
+  toggleThreeFingerAppSwitcher: () => Promise<void>;
 }
 
 /** Loads installed apps, slot config, agent config and the home dir once on mount. */
@@ -32,6 +38,8 @@ export function useAppData(): AppData {
   const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
   const [home, setHome] = useState("~");
   const [slotShortcutsEnabled, setSlotShortcutsEnabledState] = useState(true);
+  const [threeFingerAppSwitcherEnabled, setThreeFingerAppSwitcherEnabledState] =
+    useState(false);
 
   // Re-scan installed apps. Cheap (a directory walk), so it's safe to call on
   // every window show to pick up newly installed/removed apps.
@@ -49,11 +57,21 @@ export function useAppData(): AppData {
     setSlotShortcutsEnabledState(next);
   }, [slotShortcutsEnabled]);
 
+  const toggleThreeFingerAppSwitcher = useCallback(async () => {
+    const next = await setThreeFingerAppSwitcherEnabled(
+      !threeFingerAppSwitcherEnabled,
+    );
+    setThreeFingerAppSwitcherEnabledState(next);
+  }, [threeFingerAppSwitcherEnabled]);
+
   useEffect(() => {
     refreshApps();
     getSlotConfig().then((c) => setSlots(c.slots));
     getAgentConfig().then(setAgentConfig);
     getSlotShortcutsEnabled().then(setSlotShortcutsEnabledState);
+    getThreeFingerAppSwitcherEnabled().then(
+      setThreeFingerAppSwitcherEnabledState,
+    );
     homeDir().then((h) => setHome(h.replace(/\/$/, "")));
   }, [refreshApps]);
 
@@ -67,5 +85,7 @@ export function useAppData(): AppData {
     home,
     slotShortcutsEnabled,
     toggleSlotShortcuts,
+    threeFingerAppSwitcherEnabled,
+    toggleThreeFingerAppSwitcher,
   };
 }

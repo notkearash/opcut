@@ -32,3 +32,9 @@ export const getSlotShortcutsEnabled = () =>
 
 export const setSlotShortcutsEnabled = (enabled: boolean) =>
   invoke<boolean>("set_slot_shortcuts_enabled", { enabled });
+
+export const getThreeFingerAppSwitcherEnabled = () =>
+  invoke<boolean>("get_three_finger_app_switcher_enabled");
+
+export const setThreeFingerAppSwitcherEnabled = (enabled: boolean) =>
+  invoke<boolean>("set_three_finger_app_switcher_enabled", { enabled });

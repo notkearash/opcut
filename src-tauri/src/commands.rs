@@ -137,6 +137,19 @@ pub fn set_slot_shortcuts_enabled(
 }
 
 #[tauri::command]
+pub fn get_three_finger_app_switcher_enabled(app_handle: tauri::AppHandle) -> bool {
+    crate::gesture::enabled(&app_handle)
+}
+
+#[tauri::command]
+pub fn set_three_finger_app_switcher_enabled(
+    app_handle: tauri::AppHandle,
+    enabled: bool,
+) -> Result<bool, String> {
+    crate::gesture::set_enabled(&app_handle, enabled)
+}
+
+#[tauri::command]
 pub fn run_shell_command(command: String, cwd: String) -> Result<(), String> {
     let resolved_cwd = app_manager::expand_and_validate_cwd(&cwd, "~");
     app_manager::run_shell_in_ghostty(&command, &resolved_cwd)
