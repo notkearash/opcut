@@ -312,6 +312,9 @@ pub fn run() {
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
 
+            #[cfg(target_os = "macos")]
+            app_manager::register_activation_observer();
+
             let quit = MenuItem::with_id(app, "quit", "Quit opcut", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;
 

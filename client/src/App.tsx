@@ -284,7 +284,12 @@ function App() {
     }
 
     if (parsed.kind === "running-apps") {
-      return fuzzySearch(parsed.text, runningApps, (a) => a.name)
+      // An empty `*` query preserves the backend's most-recently-active order.
+      // Once the user types, fuzzy relevance takes precedence.
+      const matches = parsed.text
+        ? fuzzySearch(parsed.text, runningApps, (a) => a.name)
+        : runningApps.map((item) => ({ item, indices: [] as number[] }));
+      return matches
         .filter((m) => !hiddenRunningAppPaths.includes(m.item.path))
         .map((m) => {
           const status = killStateByPath[m.item.path];

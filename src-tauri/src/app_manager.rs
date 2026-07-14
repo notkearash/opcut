@@ -2,6 +2,112 @@ use crate::config::AppInfo;
 use std::fs;
 use std::process::Command;
 
+const RECENT_APP_LIMIT: usize = 128;
+
+fn promote_recent_path(paths: &mut Vec<String>, path: &str) {
+    paths.retain(|existing| existing != path);
+    paths.insert(0, path.to_string());
+    paths.truncate(RECENT_APP_LIMIT);
+}
+
+fn sort_by_recency(apps: &mut [AppInfo], recent_paths: &[String]) {
+    apps.sort_by(|a, b| {
+        let a_rank = recent_paths
+            .iter()
+            .position(|path| path == &a.path)
+            .unwrap_or(usize::MAX);
+        let b_rank = recent_paths
+            .iter()
+            .position(|path| path == &b.path)
+            .unwrap_or(usize::MAX);
+        a_rank
+            .cmp(&b_rank)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+}
+
+#[cfg(target_os = "macos")]
+mod recent_apps {
+    use super::{promote_recent_path, AppInfo};
+    use block2::global_block;
+    use objc2::rc::autoreleasepool;
+    use objc2_app_kit::{
+        NSRunningApplication, NSWorkspace, NSWorkspaceDidActivateApplicationNotification,
+    };
+    use objc2_foundation::NSNotification;
+    use std::ptr::NonNull;
+    use std::sync::Mutex;
+
+    static PATHS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    fn app_path(app: &NSRunningApplication) -> Option<String> {
+        let bundle_url = unsafe { app.bundleURL() }?;
+        let path = unsafe { bundle_url.path() }?;
+        Some(path.to_string())
+    }
+
+    fn record_frontmost_app() {
+        autoreleasepool(|_| {
+            let workspace = unsafe { NSWorkspace::sharedWorkspace() };
+            let Some(app) = (unsafe { workspace.frontmostApplication() }) else {
+                return;
+            };
+            let Some(path) = app_path(&app) else {
+                return;
+            };
+            if let Ok(mut paths) = PATHS.lock() {
+                promote_recent_path(&mut paths, &path);
+            }
+        });
+    }
+
+    global_block! {
+        static DID_ACTIVATE_APP = |_notification: NonNull<NSNotification>| {
+            record_frontmost_app();
+        };
+    }
+
+    pub(super) fn register_observer() {
+        record_frontmost_app();
+        autoreleasepool(|_| {
+            let workspace = unsafe { NSWorkspace::sharedWorkspace() };
+            let center = unsafe { workspace.notificationCenter() };
+            // The notification center retains this observer for its own lifetime.
+            let _observer = unsafe {
+                center.addObserverForName_object_queue_usingBlock(
+                    Some(NSWorkspaceDidActivateApplicationNotification),
+                    None,
+                    None,
+                    &DID_ACTIVATE_APP,
+                )
+            };
+        });
+    }
+
+    pub(super) fn snapshot() -> Vec<String> {
+        PATHS.lock().map(|paths| paths.clone()).unwrap_or_default()
+    }
+
+    pub(super) fn record_path(path: &str) {
+        if let Ok(mut paths) = PATHS.lock() {
+            promote_recent_path(&mut paths, path);
+        }
+    }
+
+    pub(super) fn path_for(app: &NSRunningApplication) -> Option<String> {
+        app_path(app)
+    }
+
+    pub(super) fn sort(apps: &mut [AppInfo]) {
+        super::sort_by_recency(apps, &snapshot());
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn register_activation_observer() {
+    recent_apps::register_observer();
+}
+
 fn collect_apps_from_dir(dir: &str, apps: &mut Vec<AppInfo>, recurse: bool) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -63,21 +169,20 @@ pub fn list_running_apps() -> Vec<AppInfo> {
             let Some(name) = (unsafe { app.localizedName() }) else {
                 continue;
             };
-            let Some(bundle_url) = (unsafe { app.bundleURL() }) else {
-                continue;
-            };
-            let Some(path) = (unsafe { bundle_url.path() }) else {
+            let Some(path) = recent_apps::path_for(&app) else {
                 continue;
             };
 
             apps.push(AppInfo {
                 name: name.to_string(),
-                path: path.to_string(),
+                path,
             });
         }
 
-        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        // Deduplicate by bundle path before applying the activation history.
+        apps.sort_by(|a, b| a.path.cmp(&b.path));
         apps.dedup_by(|a, b| a.path == b.path);
+        recent_apps::sort(&mut apps);
         apps
     })
 }
@@ -138,6 +243,9 @@ pub fn terminate_running_app(_path: &str) -> Result<(), String> {
 }
 
 pub fn launch_or_focus_app(path: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    recent_apps::record_path(path);
+
     Command::new("open")
         .arg("-a")
         .arg(path)
@@ -250,4 +358,37 @@ pub fn run_shell_in_ghostty(command: &str, cwd: &str) -> Result<(), String> {
 
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{promote_recent_path, sort_by_recency, AppInfo, RECENT_APP_LIMIT};
+
+    fn app(name: &str) -> AppInfo {
+        AppInfo {
+            name: name.to_string(),
+            path: format!("/{name}.app"),
+        }
+    }
+
+    #[test]
+    fn promoting_a_path_moves_it_to_the_front_without_duplicates() {
+        let mut paths = vec!["/A.app".to_string(), "/B.app".to_string()];
+        promote_recent_path(&mut paths, "/B.app");
+        assert_eq!(paths, ["/B.app", "/A.app"]);
+
+        for i in 0..RECENT_APP_LIMIT + 5 {
+            promote_recent_path(&mut paths, &format!("/{i}.app"));
+        }
+        assert_eq!(paths.len(), RECENT_APP_LIMIT);
+    }
+
+    #[test]
+    fn recent_apps_sort_first_with_alphabetical_fallback() {
+        let mut apps = vec![app("Beta"), app("Alpha"), app("Gamma")];
+        let recent = vec!["/Gamma.app".to_string(), "/Beta.app".to_string()];
+        sort_by_recency(&mut apps, &recent);
+        let names: Vec<_> = apps.iter().map(|app| app.name.as_str()).collect();
+        assert_eq!(names, ["Gamma", "Beta", "Alpha"]);
+    }
 }
