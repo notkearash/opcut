@@ -13,26 +13,37 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
+/// Convert the main window's `NSWindow` into a non-activating `NSPanel` so the launcher
+/// can float over another app's native-fullscreen Space without switching Spaces.
+///
+/// A regular `NSWindow` — even with `CanJoinAllSpaces | FullScreenAuxiliary` — can't draw
+/// over a fullscreen app, because ordering it front requires activating this (Accessory) app,
+/// which forces macOS to transition away from the fullscreen Space. A non-activating panel
+/// can be ordered front without activating the app, so it appears in place. It still becomes
+/// key (to receive keystrokes for the search field) without stealing app activation.
 #[cfg(target_os = "macos")]
-fn apply_macos_window_behavior(app: &AppHandle) {
-    use objc2::runtime::AnyObject;
-    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+fn convert_main_to_panel(app: &AppHandle) {
+    use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
+    use tauri_nspanel::WebviewWindowExt;
 
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
-    let Ok(ns_window_ptr) = window.ns_window() else {
+    let Ok(panel) = window.to_panel() else {
         return;
     };
-    if ns_window_ptr.is_null() {
-        return;
-    }
-    unsafe {
-        let ns_window: &NSWindow = &*(ns_window_ptr as *mut AnyObject as *mut NSWindow);
-        let behavior = NSWindowCollectionBehavior::CanJoinAllSpaces
-            | NSWindowCollectionBehavior::FullScreenAuxiliary;
-        ns_window.setCollectionBehavior(behavior);
-    }
+
+    // NSFloatingWindowLevel — high enough to sit above app windows.
+    panel.set_level(4);
+
+    // NSWindowStyleMaskNonActivatingPanel (1 << 7): showing the panel never activates the app.
+    panel.set_style_mask(1 << 7);
+
+    // Display on the active Space (including a fullscreen app's) and join all Spaces.
+    panel.set_collection_behaviour(
+        NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces,
+    );
 }
 
 /// Place the window horizontally centered, with its top edge at ~1/4 of the screen height
@@ -57,6 +68,25 @@ fn position_centered_upper_third(window: &tauri::WebviewWindow) {
     let _ = window.set_position(PhysicalPosition::new(x.max(mpos.x), y.max(mpos.y)));
 }
 
+#[cfg(target_os = "macos")]
+fn toggle_main_window(app: &AppHandle) {
+    use tauri_nspanel::ManagerExt;
+
+    let Ok(panel) = app.get_webview_panel("main") else {
+        return;
+    };
+    if panel.is_visible() {
+        panel.order_out(None);
+    } else {
+        if let Some(window) = app.get_webview_window("main") {
+            position_centered_upper_third(&window);
+        }
+        // Orders front (over fullscreen) and makes key for keyboard input, without activating the app.
+        panel.show();
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
 fn toggle_main_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -67,6 +97,25 @@ fn toggle_main_window(app: &AppHandle) {
         position_centered_upper_third(&window);
         let _ = window.show();
         let _ = window.set_focus();
+    }
+}
+
+/// Whether the launcher is currently on screen. On macOS the window is an `NSPanel`, so its
+/// visibility is tracked on the panel rather than the Tauri window handle.
+fn main_window_visible(app: &AppHandle) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_nspanel::ManagerExt;
+        return app
+            .get_webview_panel("main")
+            .map(|p| p.is_visible())
+            .unwrap_or(false);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        app.get_webview_window("main")
+            .and_then(|w| w.is_visible().ok())
+            .unwrap_or(false)
     }
 }
 
@@ -129,10 +178,7 @@ pub(crate) fn register_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std
                             return;
                         }
                         // Window open → ⌥N assigns that slot; window hidden → ⌥N launches it.
-                        let visible = h
-                            .get_webview_window("main")
-                            .and_then(|w| w.is_visible().ok())
-                            .unwrap_or(false);
+                        let visible = main_window_visible(&h);
                         if visible {
                             let _ = h.emit("assign-slot", i);
                         } else {
@@ -159,9 +205,14 @@ pub(crate) fn unregister_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn s
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
+
+    builder
         .invoke_handler(tauri::generate_handler![
             commands::get_installed_apps,
             commands::get_running_apps,
@@ -212,7 +263,7 @@ pub fn run() {
             }
 
             #[cfg(target_os = "macos")]
-            apply_macos_window_behavior(app.handle());
+            convert_main_to_panel(app.handle());
 
             Ok(())
         })
