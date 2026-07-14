@@ -149,6 +149,18 @@ pub fn set_three_finger_app_switcher_enabled(
     crate::gesture::set_enabled(&app_handle, enabled)
 }
 
+/// `/` pressed during an ⌥Tab hold: releasing Option must no longer switch apps.
+#[tauri::command]
+pub fn switcher_enter_search() {
+    crate::switcher::enter_search();
+}
+
+/// The panel hid or the webview otherwise ended the ⌥Tab session.
+#[tauri::command]
+pub fn switcher_cancel() {
+    crate::switcher::cancel();
+}
+
 #[tauri::command]
 pub fn run_shell_command(command: String, cwd: String) -> Result<(), String> {
     let resolved_cwd = app_manager::expand_and_validate_cwd(&cwd, "~");

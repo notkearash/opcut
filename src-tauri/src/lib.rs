@@ -2,6 +2,7 @@ mod app_manager;
 mod commands;
 mod config;
 mod gesture;
+mod switcher;
 
 use config::SlotConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -120,9 +121,9 @@ fn main_window_visible(app: &AppHandle) -> bool {
     }
 }
 
-/// Open the launcher directly in the running-app route. Unlike the regular launcher
-/// shortcut, invoking the gesture while the panel is already visible does not hide it.
-pub(crate) fn show_running_apps(app: &AppHandle) {
+/// Show the launcher panel without toggling: invoking this while the panel is already
+/// visible keeps it on screen.
+fn show_panel(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
         use tauri_nspanel::ManagerExt;
@@ -142,8 +143,19 @@ pub(crate) fn show_running_apps(app: &AppHandle) {
             let _ = window.set_focus();
         }
     }
+}
 
+/// Open the launcher directly in the running-app route (three-finger gesture).
+pub(crate) fn show_running_apps(app: &AppHandle) {
+    show_panel(app);
     let _ = app.emit("show-running-apps", ());
+}
+
+/// Open the launcher in ⌥Tab switcher mode (running apps + commit-on-Option-release).
+#[cfg(target_os = "macos")]
+pub(crate) fn show_switcher(app: &AppHandle) {
+    show_panel(app);
+    let _ = app.emit("switcher-open", ());
 }
 
 fn launch_slot(app: &AppHandle, slot_index: usize) {
@@ -189,6 +201,45 @@ fn register_toggle_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::E
             }
         })?;
     Ok(())
+}
+
+/// Register the ⌥Tab / ⇧⌥Tab app-switcher hotkeys. Carbon hotkeys consume the
+/// keystroke system-wide (it never reaches the focused app) and keep firing while our
+/// own panel is key, but they can never report the Option key going up on its own —
+/// that half of the lifecycle is watched by `switcher` polling the session modifier
+/// state. Registration failure (another app owns ⌥Tab) must not abort startup.
+#[cfg(target_os = "macos")]
+fn register_switcher_shortcuts(app: &AppHandle) {
+    for (key, backward) in [("Alt+Tab", false), ("Shift+Alt+Tab", true)] {
+        let shortcut: Shortcut = match key.parse() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("opcut: could not parse {key}: {e}");
+                continue;
+            }
+        };
+        let h = app.clone();
+        let held = Arc::new(AtomicBool::new(false));
+        let registered =
+            app.global_shortcut()
+                .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                    match event.state() {
+                        ShortcutState::Pressed => {
+                            // One step per physical press; ignore key-repeat, like ⌘Tab.
+                            if held.swap(true, Ordering::SeqCst) {
+                                return;
+                            }
+                            switcher::handle_tab(&h, backward);
+                        }
+                        ShortcutState::Released => {
+                            held.store(false, Ordering::SeqCst);
+                        }
+                    }
+                });
+        if let Err(e) = registered {
+            eprintln!("opcut: could not register {key}: {e}");
+        }
+    }
 }
 
 /// Register the ⌥1–9 quick-slot shortcuts.
@@ -255,6 +306,8 @@ pub fn run() {
             commands::set_slot_shortcuts_enabled,
             commands::get_three_finger_app_switcher_enabled,
             commands::set_three_finger_app_switcher_enabled,
+            commands::switcher_enter_search,
+            commands::switcher_cancel,
         ])
         .setup(|app| {
             app.set_activation_policy(ActivationPolicy::Accessory);
@@ -290,6 +343,8 @@ pub fn run() {
             if slot_shortcuts_enabled(app.handle()) {
                 register_slot_shortcuts(app.handle())?;
             }
+            #[cfg(target_os = "macos")]
+            register_switcher_shortcuts(app.handle());
 
             #[cfg(target_os = "macos")]
             convert_main_to_panel(app.handle());

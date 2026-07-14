@@ -11,6 +11,8 @@ import {
   launchOrFocusApp,
   runAgentQuery,
   runShellCommand,
+  switcherCancel,
+  switcherEnterSearch,
   terminateRunningApp,
 } from "./lib/tauri";
 import {
@@ -26,6 +28,9 @@ import "./App.css";
 
 type View = "search" | "settings";
 type KillStatus = "terminating" | "terminated" | "failed";
+/** ⌥Tab switcher session: "cycling" = releasing Option focuses the highlighted app;
+ *  "search" = `/` was pressed, release is disarmed and the user is typing a query. */
+type SwitcherPhase = "idle" | "cycling" | "search";
 
 function killTitle(status?: KillStatus) {
   if (status === "terminating") return "Terminating...";
@@ -39,6 +44,28 @@ function removeKillState(state: Record<string, KillStatus>, path: string) {
   delete next[path];
   return next;
 }
+
+// Bridges the Rust switcher events to the current render's handlers. Module scope —
+// the launcher window mounts a single App — so the Tauri listeners can register once
+// and never re-subscribe (a re-subscription gap could drop a rapid ⌥Tab press).
+const switcherEvents: {
+  cycle: (backward: boolean) => void;
+  commit: () => void;
+} = {
+  cycle: () => {},
+  commit: () => {},
+};
+
+// Mutable ⌥Tab session bookkeeping, module scope for the same singleton reason.
+// `phase` mirrors the React state for handlers that need the value synchronously —
+// a commit event arriving right after `/` must already observe "search".
+const switcherSession = {
+  phase: "idle" as SwitcherPhase,
+  /** Set on open; commits that outrun the open render fall back to index 1. */
+  initialAdvancePending: false,
+  /** Retry budget for a commit that arrives before the open render exists. */
+  commitRetries: 0,
+};
 
 function App() {
   const {
@@ -59,8 +86,14 @@ function App() {
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
   const [killStateByPath, setKillStateByPath] = useState<Record<string, KillStatus>>({});
   const [hiddenRunningAppPaths, setHiddenRunningAppPaths] = useState<string[]>([]);
+  const [switcherPhase, setSwitcherPhase] = useState<SwitcherPhase>("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const gestureOpenPending = useRef(false);
+
+  const changeSwitcherPhase = useCallback((phase: SwitcherPhase) => {
+    switcherSession.phase = phase;
+    setSwitcherPhase(phase);
+  }, []);
 
   const resetKillUi = useCallback(() => {
     setKillStateByPath({});
@@ -73,7 +106,11 @@ function App() {
     setView("search");
     setPickerSlot(null);
     resetKillUi();
-  }, [resetKillUi]);
+    switcherSession.initialAdvancePending = false;
+    switcherSession.commitRetries = 0;
+    changeSwitcherPhase("idle");
+    switcherCancel().catch(() => {});
+  }, [resetKillUi, changeSwitcherPhase]);
 
   const killRunningApp = useCallback(
     async (app: AppInfo) => {
@@ -300,7 +337,58 @@ function App() {
     toggleThreeFingerAppSwitcher,
   ]);
 
-  const { selected, setSelected, onKeyDown } = useKeyboardNav(results, hideAndReset);
+  const { selected, setSelected, onKeyDown } = useKeyboardNav(
+    results,
+    hideAndReset,
+    switcherPhase === "cycling",
+  );
+
+  // Further ⌥Tab (or ⇧⌥Tab) presses during the hold move the highlight.
+  const cycleSelection = useCallback(
+    (backward: boolean) => {
+      const count = results.length;
+      if (count === 0) return;
+      switcherSession.initialAdvancePending = false;
+      setSelected((s) => {
+        const clamped = Math.min(s, count - 1);
+        return backward ? (clamped - 1 + count) % count : (clamped + 1) % count;
+      });
+    },
+    [results, setSelected],
+  );
+
+  // Option released while cycling: focus the highlighted app.
+  const commitSelection = useCallback(() => {
+    if (switcherSession.phase !== "cycling") return;
+    if (parsed.kind !== "running-apps") {
+      // Quick ⌥Tab tap: the commit outran the switcher-open render. Retry through
+      // switcherEvents, which is re-pointed at the fresh handler after each render.
+      if (switcherSession.commitRetries < 30) {
+        switcherSession.commitRetries += 1;
+        window.setTimeout(() => switcherEvents.commit(), 16);
+      } else {
+        hideAndReset();
+      }
+      return;
+    }
+    switcherSession.commitRetries = 0;
+    changeSwitcherPhase("idle");
+    if (results.length === 0) {
+      hideAndReset();
+      return;
+    }
+    // The commit can also outrun the open listener's setSelected(1) render.
+    const index = switcherSession.initialAdvancePending
+      ? Math.min(1, results.length - 1)
+      : Math.min(selected, results.length - 1);
+    switcherSession.initialAdvancePending = false;
+    results[index].onActivate();
+  }, [parsed, results, selected, changeSwitcherPhase, hideAndReset]);
+
+  useEffect(() => {
+    switcherEvents.cycle = cycleSelection;
+    switcherEvents.commit = commitSelection;
+  }, [cycleSelection, commitSelection]);
 
   // --- window lifecycle ----------------------------------------------------
   // Reset to a fresh prompt on show; hide + reset on focus loss.
@@ -320,6 +408,10 @@ function App() {
         resetKillUi();
       } else {
         gestureOpenPending.current = false;
+        switcherSession.initialAdvancePending = false;
+        switcherSession.commitRetries = 0;
+        changeSwitcherPhase("idle");
+        switcherCancel().catch(() => {});
         getCurrentWindow().hide();
         setQuery("");
         setView("search");
@@ -330,24 +422,57 @@ function App() {
     return () => {
       unlisten.then((fn) => fn());
     };
+  }, [refreshApps, resetKillUi, changeSwitcherPhase]);
+
+  // Open the panel on the existing `*` running-app route. The pending ref makes
+  // this resilient to either focus/event delivery order.
+  const openRunningApps = useCallback(() => {
+    gestureOpenPending.current = true;
+    setQuery("* ");
+    setView("search");
+    setPickerSlot(null);
+    resetKillUi();
+    refreshApps();
+    inputRef.current?.focus();
   }, [refreshApps, resetKillUi]);
 
-  // The native trackpad monitor opens the panel and requests the existing `*` route.
-  // The pending ref makes this resilient to either focus/event delivery order.
+  // The native trackpad monitor opens the panel and requests the `*` route.
   useEffect(() => {
-    const unlisten = listen("show-running-apps", () => {
-      gestureOpenPending.current = true;
-      setQuery("* ");
-      setView("search");
-      setPickerSlot(null);
-      resetKillUi();
-      refreshApps();
-      inputRef.current?.focus();
+    const unlisten = listen("show-running-apps", openRunningApps);
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [openRunningApps]);
+
+  // ⌥Tab pressed while idle: same `*` route, plus commit-on-Option-release.
+  // Like ⌘Tab, the second app starts highlighted so a quick tap switches away
+  // (selection survives the async list refresh — the reset is suspended while
+  // cycling). With a single running app the commit/cycle clamps cover index 1.
+  useEffect(() => {
+    const unlisten = listen("switcher-open", () => {
+      switcherSession.initialAdvancePending = true;
+      switcherSession.commitRetries = 0;
+      changeSwitcherPhase("cycling");
+      openRunningApps();
+      setSelected(1);
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [refreshApps, resetKillUi]);
+  }, [openRunningApps, changeSwitcherPhase, setSelected]);
+
+  useEffect(() => {
+    const unlistenCycle = listen<boolean>("switcher-cycle", ({ payload }) => {
+      switcherEvents.cycle(payload);
+    });
+    const unlistenCommit = listen("switcher-commit", () => {
+      switcherEvents.commit();
+    });
+    return () => {
+      unlistenCycle.then((fn) => fn());
+      unlistenCommit.then((fn) => fn());
+    };
+  }, []);
 
   // Global ⌥1–9 while the window is open: Rust emits `assign-slot` (it can't
   // reach the webview as a keystroke). Jump into settings with that slot's picker.
@@ -365,6 +490,40 @@ function App() {
   useEffect(() => {
     if (view === "search") inputRef.current?.focus();
   }, [view, results]);
+
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      // `/` during the ⌥Tab hold: stay on the `*` route but disarm
+      // commit-on-release. Matched by physical key (e.code — ⌥/ types "÷", so
+      // e.key alone misses it) with an e.key fallback for non-ANSI layouts.
+      if (
+        switcherSession.phase === "cycling" &&
+        (e.code === "Slash" || e.key === "/")
+      ) {
+        e.preventDefault();
+        changeSwitcherPhase("search");
+        switcherEnterSearch().catch(() => {});
+        return;
+      }
+      // While Option is still held after `/`, letters would arrive as "å"-style
+      // symbols; map them back so a fuzzy query can be typed immediately.
+      if (
+        switcherSession.phase === "search" &&
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey
+      ) {
+        const letter = /^Key([A-Z])$/.exec(e.code);
+        if (letter) {
+          e.preventDefault();
+          setQuery((q) => q + (e.shiftKey ? letter[1] : letter[1].toLowerCase()));
+          return;
+        }
+      }
+      onKeyDown(e);
+    },
+    [onKeyDown, changeSwitcherPhase],
+  );
 
   // --- dynamic window height ----------------------------------------------
   const lastH = useRef(0);
@@ -412,7 +571,7 @@ function App() {
         ref={inputRef}
         value={query}
         onChange={setQuery}
-        onKeyDown={onKeyDown}
+        onKeyDown={handleSearchKeyDown}
         aiActive={aiActive}
         shellActive={shellActive}
         agentLabel={agentLabel}
