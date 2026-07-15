@@ -1,0 +1,65 @@
+<svg width="880" height="180" viewBox="0 0 880 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .f { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .m { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    @keyframes orb { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.25); opacity: 1; } }
+    .orb { animation: orb 2.4s ease-in-out infinite; transform-origin: 234px 76px; }
+    @keyframes blink { 0%, 60% { opacity: 1; } 61%, 100% { opacity: .2; } }
+    .cur { animation: blink 1.2s step-end infinite; }
+    @media (prefers-reduced-motion: reduce) { .orb, .cur { animation: none; } }
+  </style>
+
+  <defs>
+    <linearGradient id="ai" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd56b"/>
+      <stop offset="1" stop-color="#ff7ab8"/>
+    </linearGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- * open -->
+  <g filter="url(#s)">
+    <rect x="10" y="26" width="202" height="128" rx="14" fill="#121215" fill-opacity="0.97"/>
+    <rect x="10.5" y="26.5" width="201" height="127" rx="13.5" stroke="#ffffff" stroke-opacity="0.1"/>
+  </g>
+  <text x="34" y="86" class="m" font-size="26" fill="#f6f6f8">*</text>
+  <circle cx="62" cy="78" r="3.5" fill="#6ee7a8"/>
+  <circle cx="76" cy="78" r="3.5" fill="#6ee7a8" opacity="0.7"/>
+  <circle cx="90" cy="78" r="3.5" fill="#ff8a8a"/>
+  <text x="34" y="118" class="f" font-size="13.5" font-weight="600" fill="#f6f6f8">running apps</text>
+  <text x="34" y="137" class="f" font-size="11.5" fill="#ecece2" opacity="0.5">switch or quit, by recency</text>
+
+  <!-- ? agents -->
+  <g filter="url(#s)">
+    <rect x="232" y="26" width="202" height="128" rx="14" fill="#121215" fill-opacity="0.97"/>
+    <rect x="232.5" y="26.5" width="201" height="127" rx="13.5" stroke="#ffffff" stroke-opacity="0.1"/>
+  </g>
+  <text x="256" y="86" class="m" font-size="26" fill="#f6f6f8">?</text>
+  <circle cx="290" cy="76" r="7" fill="url(#ai)" class="orb"/>
+  <text x="256" y="118" class="f" font-size="13.5" font-weight="600" fill="#f6f6f8">agents</text>
+  <text x="256" y="137" class="f" font-size="11.5" fill="#ecece2" opacity="0.5">hand a task to an AI agent</text>
+
+  <!-- > commands -->
+  <g filter="url(#s)">
+    <rect x="454" y="26" width="202" height="128" rx="14" fill="#121215" fill-opacity="0.97"/>
+    <rect x="454.5" y="26.5" width="201" height="127" rx="13.5" stroke="#ffffff" stroke-opacity="0.1"/>
+  </g>
+  <text x="478" y="86" class="m" font-size="26" fill="#f6f6f8">&gt;</text>
+  <rect x="508" y="66" width="54" height="18" rx="5" fill="#ffffff" fill-opacity="0.08"/>
+  <text x="535" y="79" class="f" font-size="10.5" fill="#ecece2" opacity="0.7" text-anchor="middle">toggle&#8230;</text>
+  <text x="478" y="118" class="f" font-size="13.5" font-weight="600" fill="#f6f6f8">commands</text>
+  <text x="478" y="137" class="f" font-size="11.5" fill="#ecece2" opacity="0.5">opcut&#8217;s own command menu</text>
+
+  <!-- ! shell -->
+  <g filter="url(#s)">
+    <rect x="676" y="26" width="202" height="128" rx="14" fill="#121215" fill-opacity="0.97"/>
+    <rect x="676.5" y="26.5" width="201" height="127" rx="13.5" stroke="#ffffff" stroke-opacity="0.1"/>
+  </g>
+  <text x="700" y="86" class="m" font-size="26" fill="#f6f6f8">!</text>
+  <text x="722" y="84" class="m" font-size="13" fill="#ecece2" opacity="0.7">&#10095; uptime</text>
+  <rect x="796" y="71" width="7" height="14" fill="#f6f6f8" class="cur"/>
+  <text x="700" y="118" class="f" font-size="13.5" font-weight="600" fill="#f6f6f8">shell</text>
+  <text x="700" y="137" class="f" font-size="11.5" fill="#ecece2" opacity="0.5">run commands in your terminal</text>
+</svg>

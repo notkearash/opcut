@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="logo.svg" width="120" />
+  <img src="logo.svg" width="110" />
 </p>
 
 <h1 align="center">opcut</h1>
 
 <p align="center">
-  A lightweight macOS tray app for getting more cuts from your <kbd>Option</kbd> (aka <kbd>Alt</kbd>) key
+  More cuts from your <kbd>⌥ Option</kbd> key.<br/>
+  A lightweight macOS tray launcher, switcher, and command bar.
 </p>
 
 <p align="center">
@@ -13,18 +14,34 @@
   <img src="https://img.shields.io/github/v/release/notkearash/opcut?style=flat-square" />
 </p>
 
----
+## One key, four prefixes
 
-## Build
+Tap <kbd>⌥</kbd>, start typing to launch — or lead with a prefix:
 
-Prerequisites: [Rust](https://rustup.rs/), [Bun](https://bun.sh/)
+<p align="center">
+  <img src="assets/prefixes.svg" width="880" alt="Prefixes: * running apps, ? agents, > commands, ! shell" />
+</p>
+
+## Switch without thinking
+
+Hold <kbd>⌥</kbd> and hit <kbd>Tab</kbd> to cycle through running apps, most recent first. Or pin favorites to <kbd>⌥1</kbd>–<kbd>⌥9</kbd> and jump straight to them. A three-finger swipe opens apps too — no keys at all.
+
+<p align="center">
+  <img src="assets/switcher.svg" width="880" alt="Option-Tab app switcher cycling through running apps" />
+</p>
+
+Works over fullscreen apps. Lives quietly in the menu bar.
+
+## Install
+
+Grab the latest `.app` from [Releases](https://github.com/notkearash/opcut/releases), or build it yourself:
 
 ```bash
 bun install
-bun run build
+bun run tauri build   # output in src-tauri/target/release/bundle/macos/
 ```
 
-The bundled `.app` will be in `src-tauri/target/release/bundle/macos/`.
+Prerequisites: [Rust](https://rustup.rs/) and [Bun](https://bun.sh/).
 
 ## Development
 
@@ -32,4 +49,8 @@ The bundled `.app` will be in `src-tauri/target/release/bundle/macos/`.
 bun run dev
 ```
 
-This starts Vite and the Tauri dev window with hot reload.
+Starts Vite and the Tauri dev window with hot reload.
+
+## License
+
+See [LICENSE](LICENSE).

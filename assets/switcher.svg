@@ -1,0 +1,64 @@
+<svg width="880" height="190" viewBox="0 0 880 190" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .f { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .m { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    @keyframes step {
+      0%, 22%   { transform: translateX(0); }
+      25%, 47%  { transform: translateX(84px); }
+      50%, 72%  { transform: translateX(168px); }
+      75%, 97%  { transform: translateX(252px); }
+      100%      { transform: translateX(0); }
+    }
+    .hl { animation: step 4.8s ease-in-out infinite; }
+    @keyframes tab { 0%, 20% { opacity: .4; } 23%, 27% { opacity: 1; } 30%, 45% { opacity: .4; } 48%, 52% { opacity: 1; } 55%, 70% { opacity: .4; } 73%, 77% { opacity: 1; } 80%, 95% { opacity: .4; } 98%, 100% { opacity: 1; } }
+    .tab { animation: tab 4.8s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .hl, .tab { animation: none; } }
+  </style>
+
+  <defs>
+    <filter id="s" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- panel -->
+  <g filter="url(#s)">
+    <rect x="230" y="38" width="420" height="114" rx="16" fill="#121215" fill-opacity="0.97"/>
+    <rect x="230.5" y="38.5" width="419" height="113" rx="15.5" stroke="#ffffff" stroke-opacity="0.12"/>
+  </g>
+
+  <!-- moving selection ring -->
+  <g class="hl">
+    <rect x="252" y="56" width="62" height="62" rx="13" fill="#f6f6f8" fill-opacity="0.1" stroke="#f6f6f8" stroke-opacity="0.3"/>
+  </g>
+
+  <!-- app tiles -->
+  <g>
+    <rect x="260" y="64" width="46" height="46" rx="10" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.14"/>
+    <text x="283" y="94" class="m" font-size="15" fill="#f6f6f8" text-anchor="middle">&#10095;_</text>
+
+    <rect x="344" y="64" width="46" height="46" rx="10" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.14"/>
+    <circle cx="367" cy="87" r="9" stroke="#f6f6f8" stroke-opacity="0.85" stroke-width="1.8" fill="none"/>
+    <circle cx="367" cy="87" r="3" fill="#f6f6f8" fill-opacity="0.85"/>
+
+    <rect x="428" y="64" width="46" height="46" rx="10" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.14"/>
+    <path d="M444 95 l7 -16 l7 16 m-11.5 -5 h9" stroke="#f6f6f8" stroke-opacity="0.85" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="512" y="64" width="46" height="46" rx="10" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.14"/>
+    <path d="M528 79 h18 m-18 8 h18 m-18 8 h12" stroke="#f6f6f8" stroke-opacity="0.85" stroke-width="1.8" stroke-linecap="round"/>
+
+    <rect x="596" y="64" width="46" height="46" rx="10" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.14"/>
+    <path d="M610 96 l5 -7 l4 5 l6 -10" stroke="#f6f6f8" stroke-opacity="0.85" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="440" y="137" class="f" font-size="11.5" fill="#ecece2" opacity="0.4" text-anchor="middle">most recent first</text>
+
+  <!-- keys -->
+  <g class="tab">
+    <rect x="368" y="164" width="34" height="22" rx="6" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.18"/>
+    <text x="385" y="179" class="f" font-size="12" fill="#f6f6f8" text-anchor="middle">&#8997;</text>
+    <rect x="410" y="164" width="48" height="22" rx="6" fill="#1e1e22" stroke="#ffffff" stroke-opacity="0.18"/>
+    <text x="434" y="179" class="f" font-size="11" fill="#f6f6f8" text-anchor="middle">tab</text>
+    <text x="478" y="179" class="f" font-size="11.5" fill="#ecece2" opacity="0.5">to cycle</text>
+  </g>
+</svg>
