@@ -1,12 +1,52 @@
-<svg width="800" height="800" viewBox="0 0 800 800" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_1_2)">
-<path d="M733.333 566.667H483.333L283.333 300H66.6667C57.8261 300 49.3477 296.488 43.0964 290.237C36.8452 283.986 33.3333 275.507 33.3333 266.667C33.3333 257.826 36.8452 249.348 43.0964 243.096C49.3477 236.845 57.8261 233.333 66.6667 233.333H316.667L516.667 500H733.333C742.174 500 750.652 503.512 756.904 509.763C763.155 516.014 766.667 524.493 766.667 533.333C766.667 542.174 763.155 550.652 756.904 556.904C750.652 563.155 742.174 566.667 733.333 566.667Z" fill="white"/>
-<path d="M733.333 300H516.667C507.826 300 499.348 296.488 493.096 290.237C486.845 283.986 483.333 275.507 483.333 266.667C483.333 257.826 486.845 249.348 493.096 243.096C499.348 236.845 507.826 233.333 516.667 233.333H733.333C742.174 233.333 750.652 236.845 756.904 243.096C763.155 249.348 766.667 257.826 766.667 266.667C766.667 275.507 763.155 283.986 756.904 290.237C750.652 296.488 742.174 300 733.333 300Z" fill="white"/>
-<path d="M445.545 771.773C373.955 771.773 308.14 762.492 248.102 743.932C187.875 725.182 132.477 698.477 81.9091 663.818L81.9091 604.727C100.659 618.364 123.765 631.148 151.227 643.08C178.5 654.822 208.519 665.144 241.284 674.045C273.86 682.947 307.572 689.955 342.42 695.068C377.269 699.992 411.644 702.455 445.545 702.455C490.621 702.455 536.36 698.098 582.761 689.386C629.163 680.674 672.25 668.932 712.023 654.159C751.795 639.386 784.182 622.909 809.182 604.727V663.818C758.614 698.477 703.311 725.182 643.273 743.932C583.045 762.492 517.136 771.773 445.545 771.773Z" fill="white"/>
-</g>
-<defs>
-<clipPath id="clip0_1_2">
-<rect width="800" height="800" fill="white"/>
-</clipPath>
-</defs>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Minimalist Black Squircle Background -->
+  <rect width="1024" height="1024" rx="230" fill="#000000" />
+
+  <defs>
+    <!-- Top-Right Mask (y < x) -->
+    <clipPath id="clip-tr">
+      <polygon points="0,0 1024,0 1024,1024" />
+    </clipPath>
+    <!-- Bottom-Left Mask (y > x) -->
+    <clipPath id="clip-bl">
+      <polygon points="0,0 0,1024 1024,1024" />
+    </clipPath>
+
+    <!-- Option Key Path -->
+    <g id="option-key" stroke="#FFFFFF" stroke-width="88" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 280 340 L 440 340" />
+      <path d="M 280 684 L 400 684 L 624 340 L 744 340" />
+    </g>
+  </defs>
+
+  <!-- Bottom-Left Piece (Shifted down and left to show the slice) -->
+  <g clip-path="url(#clip-bl)" transform="translate(-24, 24)">
+    <use href="#option-key" />
+  </g>
+
+  <!-- Top-Right Piece (Shifted up and right to show the slice) -->
+  <g clip-path="url(#clip-tr)" transform="translate(24, -24)">
+    <use href="#option-key" />
+  </g>
+
+  <!-- Delicate Dashed "Cut" Line traversing the gap -->
+  <path d="M 180 180 L 844 844" stroke="#FFFFFF" stroke-width="4" stroke-dasharray="12 24" stroke-linecap="round" />
+
+  <!-- A tiny, elegant minimal open scissors placed centrally -->
+  <g transform="translate(512, 512) rotate(45) scale(0.9)">
+    <!-- Halo to cut out the dashed line underneath the scissors -->
+    <g stroke="#000000" stroke-width="16" stroke-linecap="round">
+      <path d="M -22 -16 L 40 16" />
+      <path d="M -22 16 L 40 -16" />
+    </g>
+    <circle cx="-32" cy="-16" r="14" fill="#000000" />
+    <circle cx="-32" cy="16" r="14" fill="#000000" />
+
+    <!-- Scissors Shapes -->
+    <circle cx="-32" cy="-16" r="10" stroke="#FFFFFF" stroke-width="6" fill="#000000" />
+    <circle cx="-32" cy="16" r="10" stroke="#FFFFFF" stroke-width="6" fill="#000000" />
+    <path d="M -22 -16 L 40 16" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" />
+    <path d="M -22 16 L 40 -16" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" />
+    <circle cx="-2" cy="0" r="3" fill="#FFFFFF" />
+  </g>
 </svg>

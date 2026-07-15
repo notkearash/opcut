@@ -319,7 +319,9 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&quit])?;
 
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                // The full app icon has an opaque squircle. A dedicated transparent
+                // mark keeps the macOS template icon crisp in both menu-bar themes.
+                .icon(tauri::include_image!("./icons/tray-icon.png"))
                 .icon_as_template(true)
                 .menu(&menu)
                 .show_menu_on_left_click(false)

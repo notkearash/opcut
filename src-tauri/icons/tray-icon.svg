@@ -1,0 +1,24 @@
+<svg width="44" height="44" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Menu-bar adaptation of the app mark: transparent and monochrome so
+       macOS can tint it correctly when used as a template image. -->
+  <defs>
+    <clipPath id="clip-tr">
+      <polygon points="0,0 512,0 512,512" />
+    </clipPath>
+    <clipPath id="clip-bl">
+      <polygon points="0,0 0,512 512,512" />
+    </clipPath>
+    <g id="option-key" stroke="#FFFFFF" stroke-width="54" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 54 154 L 198 154" />
+      <path d="M 54 358 L 156 358 L 352 154 L 458 154" />
+    </g>
+  </defs>
+
+  <g clip-path="url(#clip-bl)" transform="translate(-14, 14)">
+    <use href="#option-key" />
+  </g>
+  <g clip-path="url(#clip-tr)" transform="translate(14, -14)">
+    <use href="#option-key" />
+  </g>
+  <path d="M 54 54 L 458 458" stroke="#FFFFFF" stroke-width="16" stroke-dasharray="28 30" stroke-linecap="round" />
+</svg>
