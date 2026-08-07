@@ -19,12 +19,12 @@
     </filter>
   </defs>
 
-  <!-- * open -->
+  <!-- / open -->
   <g filter="url(#s)">
     <rect x="10" y="26" width="202" height="128" rx="14" fill="#121215" fill-opacity="0.97"/>
     <rect x="10.5" y="26.5" width="201" height="127" rx="13.5" stroke="#ffffff" stroke-opacity="0.1"/>
   </g>
-  <text x="34" y="86" class="m" font-size="26" fill="#f6f6f8">*</text>
+  <text x="34" y="86" class="m" font-size="26" fill="#f6f6f8">/</text>
   <circle cx="62" cy="78" r="3.5" fill="#6ee7a8"/>
   <circle cx="76" cy="78" r="3.5" fill="#6ee7a8" opacity="0.7"/>
   <circle cx="90" cy="78" r="3.5" fill="#ff8a8a"/>

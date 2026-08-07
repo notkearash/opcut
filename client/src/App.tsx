@@ -284,7 +284,7 @@ function App() {
     }
 
     if (parsed.kind === "running-apps") {
-      // An empty `*` query preserves the backend's most-recently-active order.
+      // An empty `/` query preserves the backend's most-recently-active order.
       // Once the user types, fuzzy relevance takes precedence.
       const matches = parsed.text
         ? fuzzySearch(parsed.text, runningApps, (a) => a.name)
@@ -426,11 +426,11 @@ function App() {
     };
   }, [refreshApps, resetKillUi, changeSwitcherPhase]);
 
-  // Open the panel on the existing `*` running-app route. The pending ref makes
+  // Open the panel on the existing `/` running-app route. The pending ref makes
   // this resilient to either focus/event delivery order.
   const openRunningApps = useCallback(() => {
     gestureOpenPending.current = true;
-    setQuery("* ");
+    setQuery("/ ");
     setView("search");
     setPickerSlot(null);
     resetKillUi();
@@ -438,7 +438,7 @@ function App() {
     inputRef.current?.focus();
   }, [refreshApps, resetKillUi]);
 
-  // The native trackpad monitor opens the panel and requests the `*` route.
+  // The native trackpad monitor opens the panel and requests the `/` route.
   useEffect(() => {
     const unlisten = listen("show-running-apps", openRunningApps);
     return () => {
@@ -446,7 +446,7 @@ function App() {
     };
   }, [openRunningApps]);
 
-  // ⌥Tab pressed while idle: same `*` route, plus commit-on-Option-release.
+  // ⌥Tab pressed while idle: same `/` route, plus commit-on-Option-release.
   // Like ⌘Tab, the second app starts highlighted so a quick tap switches away
   // (selection survives the async list refresh — the reset is suspended while
   // cycling). With a single running app the commit/cycle clamps cover index 1.
@@ -495,7 +495,7 @@ function App() {
 
   const handleSearchKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // `/` during the ⌥Tab hold: stay on the `*` route but disarm
+      // `/` during the ⌥Tab hold: stay on the `/` route but disarm
       // commit-on-release. Matched by physical key (e.code — ⌥/ types "÷", so
       // e.key alone misses it) with an e.key fallback for non-ANSI layouts.
       if (

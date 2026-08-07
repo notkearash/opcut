@@ -19,7 +19,7 @@
 Tap <kbd>⌥</kbd>, start typing to launch — or lead with a prefix:
 
 <p align="center">
-  <img src="assets/prefixes.svg" width="880" alt="Prefixes: * running apps, ? agents, > commands, ! shell" />
+  <img src="assets/prefixes.svg" width="880" alt="Prefixes: / running apps, ? agents, > commands, ! shell" />
 </p>
 
 ## Switch without thinking

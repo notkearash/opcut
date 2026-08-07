@@ -41,7 +41,7 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           placeholder={
             agentLabel
               ? "describe the task…"
-              : "Search · * open · ? agents · > commands · ! shell"
+              : "Search · / open · ? agents · > commands · ! shell"
           }
           value={value}
           onChange={(e) => onChange(e.target.value)}
