@@ -4,18 +4,16 @@ import { AppGlyph, CommandGlyph, ShellGlyph } from "./Glyphs";
 interface ResultItemProps {
   row: ResultRow;
   selected: boolean;
-  /** PNG data URI for `row.iconPath`, once it has loaded. */
-  icon?: string;
-  onHover: () => void;
+  iconDataUri?: string;
+  onHover: (e: React.MouseEvent) => void;
   onActivate: () => void;
 }
 
-/** Bold the fuzzy-matched characters in the title. */
-function highlight(title: string, indices?: number[]) {
-  if (!indices || indices.length === 0) return title;
-  const set = new Set(indices);
+function highlightMatchedChars(title: string, matchedIndices?: number[]) {
+  if (!matchedIndices || matchedIndices.length === 0) return title;
+  const matched = new Set(matchedIndices);
   return [...title].map((ch, i) =>
-    set.has(i) ? (
+    matched.has(i) ? (
       <mark key={i} className="hl">
         {ch}
       </mark>
@@ -25,15 +23,11 @@ function highlight(title: string, indices?: number[]) {
   );
 }
 
-/**
- * Leading visual: a real app icon where we have one, otherwise a shape that reads at the
- * same size — a glyph for the synthetic rows, a monogram for an app we couldn't rasterize.
- */
-function Media({ row, icon }: { row: ResultRow; icon?: string }) {
-  if (icon) {
+function Media({ row, iconDataUri }: { row: ResultRow; iconDataUri?: string }) {
+  if (iconDataUri) {
     return (
       <span className="result-media" data-media="icon">
-        <img className="result-icon" src={icon} alt="" draggable={false} />
+        <img className="result-icon" src={iconDataUri} alt="" draggable={false} />
       </span>
     );
   }
@@ -58,10 +52,10 @@ function Media({ row, icon }: { row: ResultRow; icon?: string }) {
       </span>
     );
   }
-  const initial = [...row.title.trim()][0];
+  const monogram = [...row.title.trim()][0];
   return (
-    <span className="result-media" data-media={initial ? "monogram" : "glyph"}>
-      {initial ? initial.toUpperCase() : <AppGlyph />}
+    <span className="result-media" data-media={monogram ? "monogram" : "glyph"}>
+      {monogram ? monogram.toUpperCase() : <AppGlyph />}
     </span>
   );
 }
@@ -69,7 +63,7 @@ function Media({ row, icon }: { row: ResultRow; icon?: string }) {
 export default function ResultItem({
   row,
   selected,
-  icon,
+  iconDataUri,
   onHover,
   onActivate,
 }: ResultItemProps) {
@@ -81,9 +75,11 @@ export default function ResultItem({
       onMouseMove={onHover}
       onClick={onActivate}
     >
-      <Media row={row} icon={icon} />
+      <Media row={row} iconDataUri={iconDataUri} />
       <span className="result-text">
-        <span className="result-title">{highlight(row.title, row.matchIndices)}</span>
+        <span className="result-title">
+          {highlightMatchedChars(row.title, row.matchIndicesInTitle)}
+        </span>
         {row.subtitle && <span className="result-subtitle">{row.subtitle}</span>}
       </span>
       <span className="result-enter">

@@ -6,8 +6,10 @@ import type { AppInfo, ResultRow } from "./types";
 import { useAppData } from "./hooks/useAppData";
 import { useAppIcons } from "./hooks/useAppIcons";
 import { useKeyboardNav } from "./hooks/useKeyboardNav";
+import { useMouseRejection } from "./hooks/useMouseRejection";
 import { parseQuery } from "./lib/parseQuery";
 import { fuzzySearch } from "./lib/fuzzy";
+import { joinIconPaths, splitIconPaths } from "./lib/iconPaths";
 import {
   launchOrFocusApp,
   runShellCommand,
@@ -26,12 +28,15 @@ import SettingsView from "./components/SettingsView";
 import "./App.css";
 
 type View = "search" | "settings";
-/** `>` words that open the shell-folder setting. */
-const CWD_COMMAND_IDS = ["cwd", "folder", "dir"];
 type KillStatus = "terminating" | "terminated" | "failed";
-/** ⌥Tab switcher session: "cycling" = releasing Option focuses the highlighted app;
- *  "search" = `/` was pressed, release is disarmed and the user is typing a query. */
 type SwitcherPhase = "idle" | "cycling" | "search";
+
+const SHELL_FOLDER_COMMAND_IDS = ["cwd", "folder", "dir"];
+const TERMINATED_ROW_LINGER_MS = 1500;
+const KILL_FAILED_ROW_LINGER_MS = 2600;
+const COMMIT_RETRY_LIMIT = 30;
+const COMMIT_RETRY_DELAY_MS = 16;
+const RUNNING_APPS_QUERY = "/ ";
 
 function killTitle(status?: KillStatus) {
   if (status === "terminating") return "Terminating...";
@@ -46,9 +51,21 @@ function removeKillState(state: Record<string, KillStatus>, path: string) {
   return next;
 }
 
-// Bridges the Rust switcher events to the current render's handlers. Module scope —
-// the launcher window mounts a single App — so the Tauri listeners can register once
-// and never re-subscribe (a re-subscription gap could drop a rapid ⌥Tab press).
+function isSlashKey(e: React.KeyboardEvent) {
+  return e.code === "Slash" || e.key === "/";
+}
+
+function optionTypedLetter(e: React.KeyboardEvent) {
+  if (!e.altKey || e.metaKey || e.ctrlKey) return null;
+  const match = /^Key([A-Z])$/.exec(e.code);
+  if (!match) return null;
+  return e.shiftKey ? match[1] : match[1].toLowerCase();
+}
+
+function isVerticalArrow(e: React.KeyboardEvent) {
+  return e.key === "ArrowDown" || e.key === "ArrowUp";
+}
+
 const switcherEvents: {
   cycle: (backward: boolean) => void;
   commit: () => void;
@@ -57,14 +74,9 @@ const switcherEvents: {
   commit: () => {},
 };
 
-// Mutable ⌥Tab session bookkeeping, module scope for the same singleton reason.
-// `phase` mirrors the React state for handlers that need the value synchronously —
-// a commit event arriving right after `/` must already observe "search".
 const switcherSession = {
   phase: "idle" as SwitcherPhase,
-  /** Set on open; commits that outrun the open render fall back to index 1. */
   initialAdvancePending: false,
-  /** Retry budget for a commit that arrives before the open render exists. */
   commitRetries: 0,
 };
 
@@ -127,19 +139,18 @@ function App() {
           );
           setKillStateByPath((state) => removeKillState(state, app.path));
           refreshApps();
-        }, 1500);
+        }, TERMINATED_ROW_LINGER_MS);
       } catch {
         setKillStateByPath((state) => ({ ...state, [app.path]: "failed" }));
         window.setTimeout(() => {
           setKillStateByPath((state) => removeKillState(state, app.path));
           refreshApps();
-        }, 2600);
+        }, KILL_FAILED_ROW_LINGER_MS);
       }
     },
     [refreshApps],
   );
 
-  // --- query parsing & result building -------------------------------------
   const parsed = useMemo(
     () =>
       parseQuery(query, { homeDir: home, defaultCwd: shellCwd }),
@@ -175,27 +186,23 @@ function App() {
     }
 
     if (parsed.kind === "command-menu") {
-      // `>cwd <path>` takes an argument, so it can't be a plain menu entry: with a path
-      // typed it saves, without one it seeds the query so the path can be typed inline.
-      if (CWD_COMMAND_IDS.includes(parsed.head)) {
-        const arg = parsed.arg;
+      if (SHELL_FOLDER_COMMAND_IDS.includes(parsed.commandWord)) {
+        const pathArg = parsed.commandArgument;
         return [
           {
             kind: "command" as const,
             id: "cmd-cwd",
             badge: "›",
-            title: arg
-              ? `Set shell folder to ${arg}`
+            title: pathArg
+              ? `Set shell folder to ${pathArg}`
               : `Shell folder · ${shellCwd.replace(home, "~")}`,
-            subtitle: arg
+            subtitle: pathArg
               ? "saved for every ! command · ↵ to confirm"
               : "type a path after the command, e.g. > cwd ~/src",
-            onActivate: arg
+            onActivate: pathArg
               ? () => {
-                  saveShellCwd(arg).finally(hideAndReset);
+                  saveShellCwd(pathArg).finally(hideAndReset);
                 }
-              // Focus is not touched here: the search-view effect below refocuses the
-              // input whenever the results change, which seeding the query does.
               : () => setQuery(">cwd "),
           },
         ];
@@ -264,8 +271,8 @@ function App() {
       return commands
         .filter(
           (c) =>
-            c.id.startsWith(parsed.partial) ||
-            c.title.toLowerCase().includes(parsed.partial),
+            c.id.startsWith(parsed.filterText) ||
+            c.title.toLowerCase().includes(parsed.filterText),
         )
         .map((c) => ({
           kind: "command" as const,
@@ -283,18 +290,20 @@ function App() {
           kind: "app" as const,
           id: m.item.path,
           title: m.item.name,
-          iconPath: m.item.path,
-          matchIndices: m.indices,
+          iconBundlePath: m.item.path,
+          matchIndicesInTitle: m.indices,
           onActivate: () => launchOrFocusApp(m.item.path).finally(hideAndReset),
         }));
     }
 
     if (parsed.kind === "running-apps") {
-      // An empty `/` query preserves the backend's most-recently-active order.
-      // Once the user types, fuzzy relevance takes precedence.
+      const inMostRecentlyActiveOrder = runningApps.map((item) => ({
+        item,
+        indices: [] as number[],
+      }));
       const matches = parsed.text
         ? fuzzySearch(parsed.text, runningApps, (a) => a.name)
-        : runningApps.map((item) => ({ item, indices: [] as number[] }));
+        : inMostRecentlyActiveOrder;
       return matches
         .filter((m) => !hiddenRunningAppPaths.includes(m.item.path))
         .map((m) => {
@@ -303,9 +312,9 @@ function App() {
             kind: "app" as const,
             id: `running-${m.item.path}`,
             title: killTitle(status) ?? m.item.name,
-            iconPath: m.item.path,
+            iconBundlePath: m.item.path,
             subtitle: status ? m.item.name : undefined,
-            matchIndices: status ? undefined : m.indices,
+            matchIndicesInTitle: status ? undefined : m.indices,
             status,
             onActivate: status
               ? () => {}
@@ -316,7 +325,6 @@ function App() {
         });
     }
 
-    // empty query → assigned quick slots
     return slots
       .map((app, i) => ({ app, i }))
       .filter((s): s is { app: NonNullable<typeof s.app>; i: number } => s.app !== null)
@@ -324,7 +332,7 @@ function App() {
         kind: "slot" as const,
         id: `slot-${i}`,
         badge: String(i + 1),
-        iconPath: app.path,
+        iconBundlePath: app.path,
         title: app.name,
         subtitle: `⌥${i + 1}`,
         onActivate: () => launchOrFocusApp(app.path).finally(hideAndReset),
@@ -350,23 +358,22 @@ function App() {
     toggleIcons,
   ]);
 
-  // Fetch the icons the current result set needs. Keyed on the joined paths so a query that
-  // reshuffles the same apps doesn't re-request, and skipped entirely when icons are off.
-  const iconPathKey = useMemo(
+  const iconPathsToLoad = useMemo(
     () =>
       iconsEnabled
-        ? results
-            .map((r) => r.iconPath)
-            .filter((p): p is string => Boolean(p))
-            .join("\u0000")
+        ? joinIconPaths(
+            results
+              .map((r) => r.iconBundlePath)
+              .filter((p): p is string => Boolean(p)),
+          )
         : "",
     [results, iconsEnabled],
   );
 
   useEffect(() => {
-    if (!iconPathKey) return;
-    requestIcons(iconPathKey.split("\u0000"));
-  }, [iconPathKey, requestIcons]);
+    if (!iconPathsToLoad) return;
+    requestIcons(splitIconPaths(iconPathsToLoad));
+  }, [iconPathsToLoad, requestIcons]);
 
   const { selected, setSelected, onKeyDown } = useKeyboardNav(
     results,
@@ -374,29 +381,36 @@ function App() {
     switcherPhase === "cycling",
   );
 
-  // Further ⌥Tab (or ⇧⌥Tab) presses during the hold move the highlight.
+  const { acceptHover, disarmHover } = useMouseRejection();
+
+  const handleHover = useCallback(
+    (i: number, e: React.MouseEvent) => {
+      if (acceptHover(e)) setSelected(i);
+    },
+    [acceptHover, setSelected],
+  );
+
   const cycleSelection = useCallback(
     (backward: boolean) => {
       const count = results.length;
       if (count === 0) return;
+      disarmHover();
       switcherSession.initialAdvancePending = false;
       setSelected((s) => {
         const clamped = Math.min(s, count - 1);
         return backward ? (clamped - 1 + count) % count : (clamped + 1) % count;
       });
     },
-    [results, setSelected],
+    [results, setSelected, disarmHover],
   );
 
-  // Option released while cycling: focus the highlighted app.
   const commitSelection = useCallback(() => {
     if (switcherSession.phase !== "cycling") return;
-    if (parsed.kind !== "running-apps") {
-      // Quick ⌥Tab tap: the commit outran the switcher-open render. Retry through
-      // switcherEvents, which is re-pointed at the fresh handler after each render.
-      if (switcherSession.commitRetries < 30) {
+    const openRenderHasNotLandedYet = parsed.kind !== "running-apps";
+    if (openRenderHasNotLandedYet) {
+      if (switcherSession.commitRetries < COMMIT_RETRY_LIMIT) {
         switcherSession.commitRetries += 1;
-        window.setTimeout(() => switcherEvents.commit(), 16);
+        window.setTimeout(() => switcherEvents.commit(), COMMIT_RETRY_DELAY_MS);
       } else {
         hideAndReset();
       }
@@ -408,7 +422,6 @@ function App() {
       hideAndReset();
       return;
     }
-    // The commit can also outrun the open listener's setSelected(1) render.
     const index = switcherSession.initialAdvancePending
       ? Math.min(1, results.length - 1)
       : Math.min(selected, results.length - 1);
@@ -421,53 +434,52 @@ function App() {
     switcherEvents.commit = commitSelection;
   }, [cycleSelection, commitSelection]);
 
-  // --- window lifecycle ----------------------------------------------------
-  // Reset to a fresh prompt on show; hide + reset on focus loss.
   useEffect(() => {
-    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (focused) {
-        if (gestureOpenPending.current) {
-          gestureOpenPending.current = false;
-        } else {
-          setQuery("");
-        }
-        setView("search");
-        setPickerSlot(null);
-        inputRef.current?.focus();
-        // Re-scan apps on every show so newly installed apps appear without a restart.
-        refreshApps();
-        resetKillUi();
-      } else {
+    const showFreshPrompt = () => {
+      if (gestureOpenPending.current) {
         gestureOpenPending.current = false;
-        switcherSession.initialAdvancePending = false;
-        switcherSession.commitRetries = 0;
-        changeSwitcherPhase("idle");
-        switcherCancel().catch(() => {});
-        getCurrentWindow().hide();
+      } else {
         setQuery("");
-        setView("search");
-        setPickerSlot(null);
-        resetKillUi();
       }
+      setView("search");
+      setPickerSlot(null);
+      inputRef.current?.focus();
+      refreshApps();
+      resetKillUi();
+    };
+    const hideAndForgetSession = () => {
+      gestureOpenPending.current = false;
+      switcherSession.initialAdvancePending = false;
+      switcherSession.commitRetries = 0;
+      changeSwitcherPhase("idle");
+      switcherCancel().catch(() => {});
+      getCurrentWindow().hide();
+      setQuery("");
+      setView("search");
+      setPickerSlot(null);
+      resetKillUi();
+    };
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      disarmHover();
+      if (focused) showFreshPrompt();
+      else hideAndForgetSession();
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [refreshApps, resetKillUi, changeSwitcherPhase]);
+  }, [refreshApps, resetKillUi, changeSwitcherPhase, disarmHover]);
 
-  // Open the panel on the existing `/` running-app route. The pending ref makes
-  // this resilient to either focus/event delivery order.
   const openRunningApps = useCallback(() => {
     gestureOpenPending.current = true;
-    setQuery("/ ");
+    setQuery(RUNNING_APPS_QUERY);
     setView("search");
     setPickerSlot(null);
     resetKillUi();
     refreshApps();
+    disarmHover();
     inputRef.current?.focus();
-  }, [refreshApps, resetKillUi]);
+  }, [refreshApps, resetKillUi, disarmHover]);
 
-  // The native trackpad monitor opens the panel and requests the `/` route.
   useEffect(() => {
     const unlisten = listen("show-running-apps", openRunningApps);
     return () => {
@@ -475,17 +487,14 @@ function App() {
     };
   }, [openRunningApps]);
 
-  // ⌥Tab pressed while idle: same `/` route, plus commit-on-Option-release.
-  // Like ⌘Tab, the second app starts highlighted so a quick tap switches away
-  // (selection survives the async list refresh — the reset is suspended while
-  // cycling). With a single running app the commit/cycle clamps cover index 1.
   useEffect(() => {
     const unlisten = listen("switcher-open", () => {
       switcherSession.initialAdvancePending = true;
       switcherSession.commitRetries = 0;
       changeSwitcherPhase("cycling");
       openRunningApps();
-      setSelected(1);
+      const secondMostRecentApp = 1;
+      setSelected(secondMostRecentApp);
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -505,8 +514,6 @@ function App() {
     };
   }, []);
 
-  // Global ⌥1–9 while the window is open: Rust emits `assign-slot` (it can't
-  // reach the webview as a keystroke). Jump into settings with that slot's picker.
   useEffect(() => {
     const unlisten = listen<number>("assign-slot", ({ payload: slot }) => {
       setView("settings");
@@ -517,61 +524,46 @@ function App() {
     };
   }, []);
 
-  // Keep focus on the input whenever we're in search view.
   useEffect(() => {
     if (view === "search") inputRef.current?.focus();
   }, [view, results]);
 
   const handleSearchKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // `/` during the ⌥Tab hold: stay on the `/` route but disarm
-      // commit-on-release. Matched by physical key (e.code — ⌥/ types "÷", so
-      // e.key alone misses it) with an e.key fallback for non-ANSI layouts.
-      if (
-        switcherSession.phase === "cycling" &&
-        (e.code === "Slash" || e.key === "/")
-      ) {
+      if (switcherSession.phase === "cycling" && isSlashKey(e)) {
         e.preventDefault();
         changeSwitcherPhase("search");
         switcherEnterSearch().catch(() => {});
         return;
       }
-      // While Option is still held after `/`, letters would arrive as "å"-style
-      // symbols; map them back so a fuzzy query can be typed immediately.
-      if (
-        switcherSession.phase === "search" &&
-        e.altKey &&
-        !e.metaKey &&
-        !e.ctrlKey
-      ) {
-        const letter = /^Key([A-Z])$/.exec(e.code);
+      if (switcherSession.phase === "search") {
+        const letter = optionTypedLetter(e);
         if (letter) {
           e.preventDefault();
-          setQuery((q) => q + (e.shiftKey ? letter[1] : letter[1].toLowerCase()));
+          setQuery((q) => q + letter);
           return;
         }
       }
+      if (isVerticalArrow(e)) disarmHover();
       onKeyDown(e);
     },
-    [onKeyDown, changeSwitcherPhase],
+    [onKeyDown, changeSwitcherPhase, disarmHover],
   );
 
-  // --- dynamic window height ----------------------------------------------
-  const lastH = useRef(0);
+  const lastWindowHeight = useRef(0);
   useLayoutEffect(() => {
-    const h =
+    const height =
       view === "settings"
         ? settingsWindowHeight()
         : windowHeight(results.length, query.trim().length > 0);
-    if (h === lastH.current) return;
-    lastH.current = h;
+    if (height === lastWindowHeight.current) return;
+    lastWindowHeight.current = height;
     const raf = requestAnimationFrame(() => {
-      getCurrentWindow().setSize(new LogicalSize(WIN_W, h));
+      getCurrentWindow().setSize(new LogicalSize(WIN_W, height));
     });
     return () => cancelAnimationFrame(raf);
   }, [results.length, view, query]);
 
-  // --- render --------------------------------------------------------------
   if (view === "settings") {
     return (
       <div className="shell">
@@ -581,7 +573,7 @@ function App() {
           onSlotsChange={setSlots}
           pickerSlot={pickerSlot}
           onPickerSlotChange={setPickerSlot}
-          icons={iconsEnabled ? icons : {}}
+          iconsByBundlePath={iconsEnabled ? icons : {}}
           requestIcons={requestIcons}
           onClose={() => {
             setView("search");
@@ -612,8 +604,8 @@ function App() {
           <ResultList
             rows={results}
             selected={selected}
-            icons={iconsEnabled ? icons : {}}
-            onHover={setSelected}
+            iconsByBundlePath={iconsEnabled ? icons : {}}
+            onHover={handleHover}
           />
           <Footer count={results.length} killHint={killHint} />
         </>
