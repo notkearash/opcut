@@ -16,14 +16,11 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
-/// Convert the main window's `NSWindow` into a non-activating `NSPanel` so the launcher
-/// can float over another app's native-fullscreen Space without switching Spaces.
-///
-/// A regular `NSWindow` — even with `CanJoinAllSpaces | FullScreenAuxiliary` — can't draw
-/// over a fullscreen app, because ordering it front requires activating this (Accessory) app,
-/// which forces macOS to transition away from the fullscreen Space. A non-activating panel
-/// can be ordered front without activating the app, so it appears in place. It still becomes
-/// key (to receive keystrokes for the search field) without stealing app activation.
+#[cfg(target_os = "macos")]
+const NS_FLOATING_WINDOW_LEVEL: i32 = 4;
+#[cfg(target_os = "macos")]
+const NS_WINDOW_STYLE_MASK_NON_ACTIVATING_PANEL: i32 = 1 << 7;
+
 #[cfg(target_os = "macos")]
 fn convert_main_to_panel(app: &AppHandle) {
     use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
@@ -36,22 +33,14 @@ fn convert_main_to_panel(app: &AppHandle) {
         return;
     };
 
-    // NSFloatingWindowLevel — high enough to sit above app windows.
-    panel.set_level(4);
-
-    // NSWindowStyleMaskNonActivatingPanel (1 << 7): showing the panel never activates the app.
-    panel.set_style_mask(1 << 7);
-
-    // Display on the active Space (including a fullscreen app's) and join all Spaces.
+    panel.set_level(NS_FLOATING_WINDOW_LEVEL);
+    panel.set_style_mask(NS_WINDOW_STYLE_MASK_NON_ACTIVATING_PANEL);
     panel.set_collection_behaviour(
         NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
             | NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces,
     );
 }
 
-/// Place the window horizontally centered, with its top edge at ~1/4 of the screen height
-/// (Spotlight-style upper-third). Top-anchored so the window can grow downward without
-/// needing to reposition when results change.
 fn position_centered_upper_third(window: &tauri::WebviewWindow) {
     let monitor = window
         .current_monitor()
@@ -84,7 +73,6 @@ fn toggle_main_window(app: &AppHandle) {
         if let Some(window) = app.get_webview_window("main") {
             position_centered_upper_third(&window);
         }
-        // Orders front (over fullscreen) and makes key for keyboard input, without activating the app.
         panel.show();
     }
 }
@@ -103,8 +91,6 @@ fn toggle_main_window(app: &AppHandle) {
     }
 }
 
-/// Whether the launcher is currently on screen. On macOS the window is an `NSPanel`, so its
-/// visibility is tracked on the panel rather than the Tauri window handle.
 fn main_window_visible(app: &AppHandle) -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -122,8 +108,6 @@ fn main_window_visible(app: &AppHandle) -> bool {
     }
 }
 
-/// Show the launcher panel without toggling: invoking this while the panel is already
-/// visible keeps it on screen.
 fn show_panel(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
@@ -146,13 +130,11 @@ fn show_panel(app: &AppHandle) {
     }
 }
 
-/// Open the launcher directly in the running-app route (three-finger gesture).
 pub(crate) fn show_running_apps(app: &AppHandle) {
     show_panel(app);
     let _ = app.emit("show-running-apps", ());
 }
 
-/// Open the launcher in ⌥Tab switcher mode (running apps + commit-on-Option-release).
 #[cfg(target_os = "macos")]
 pub(crate) fn show_switcher(app: &AppHandle) {
     show_panel(app);
@@ -171,11 +153,10 @@ fn launch_slot(app: &AppHandle, slot_index: usize) {
     }
 }
 
-const SLOT_SHORTCUT_KEYS: [&str; 9] = [
+const SLOT_SHORTCUT_KEYS: [&str; config::SLOT_COUNT] = [
     "Alt+1", "Alt+2", "Alt+3", "Alt+4", "Alt+5", "Alt+6", "Alt+7", "Alt+8", "Alt+9",
 ];
 
-/// Whether the ⌥1–9 quick-slot shortcuts are enabled (stored flag, default on).
 pub(crate) fn slot_shortcuts_enabled(app: &AppHandle) -> bool {
     let store = app.store("config.json").expect("failed to access store");
     store
@@ -184,7 +165,6 @@ pub(crate) fn slot_shortcuts_enabled(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
-/// Directory `!` shell commands run in when the query has no inline `@ <path>`.
 pub(crate) fn shell_cwd(app: &AppHandle) -> String {
     let store = app.store("config.json").expect("failed to access store");
     store
@@ -194,7 +174,6 @@ pub(crate) fn shell_cwd(app: &AppHandle) -> String {
         .cwd
 }
 
-/// Whether result rows show real app icons (stored flag, default on).
 pub(crate) fn icons_enabled(app: &AppHandle) -> bool {
     let store = app.store("config.json").expect("failed to access store");
     store
@@ -203,7 +182,6 @@ pub(crate) fn icons_enabled(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
-/// Register the always-on ⌥Space launcher toggle.
 fn register_toggle_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let toggle: Shortcut = "Alt+Space".parse()?;
     let h0 = app.clone();
@@ -223,11 +201,6 @@ fn register_toggle_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-/// Register the ⌥Tab / ⇧⌥Tab app-switcher hotkeys. Carbon hotkeys consume the
-/// keystroke system-wide (it never reaches the focused app) and keep firing while our
-/// own panel is key, but they can never report the Option key going up on its own —
-/// that half of the lifecycle is watched by `switcher` polling the session modifier
-/// state. Registration failure (another app owns ⌥Tab) must not abort startup.
 #[cfg(target_os = "macos")]
 fn register_switcher_shortcuts(app: &AppHandle) {
     for (key, backward) in [("Alt+Tab", false), ("Shift+Alt+Tab", true)] {
@@ -245,8 +218,8 @@ fn register_switcher_shortcuts(app: &AppHandle) {
                 .on_shortcut(shortcut, move |_app, _shortcut, event| {
                     match event.state() {
                         ShortcutState::Pressed => {
-                            // One step per physical press; ignore key-repeat, like ⌘Tab.
-                            if held.swap(true, Ordering::SeqCst) {
+                            let key_repeat = held.swap(true, Ordering::SeqCst);
+                            if key_repeat {
                                 return;
                             }
                             switcher::handle_tab(&h, backward);
@@ -262,7 +235,6 @@ fn register_switcher_shortcuts(app: &AppHandle) {
     }
 }
 
-/// Register the ⌥1–9 quick-slot shortcuts.
 pub(crate) fn register_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     for (i, key) in SLOT_SHORTCUT_KEYS.iter().enumerate() {
         let shortcut: Shortcut = key.parse()?;
@@ -275,9 +247,8 @@ pub(crate) fn register_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std
                         if held.swap(true, Ordering::SeqCst) {
                             return;
                         }
-                        // Window open → ⌥N assigns that slot; window hidden → ⌥N launches it.
-                        let visible = main_window_visible(&h);
-                        if visible {
+                        let launcher_is_open = main_window_visible(&h);
+                        if launcher_is_open {
                             let _ = h.emit("assign-slot", i);
                         } else {
                             launch_slot(&h, i);
@@ -292,7 +263,6 @@ pub(crate) fn register_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std
     Ok(())
 }
 
-/// Unregister the ⌥1–9 quick-slot shortcuts, releasing them back to the system.
 pub(crate) fn unregister_slot_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     for key in SLOT_SHORTCUT_KEYS.iter() {
         let shortcut: Shortcut = key.parse()?;
@@ -341,8 +311,6 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&quit])?;
 
             let _tray = TrayIconBuilder::new()
-                // The full app icon has an opaque squircle. A dedicated transparent
-                // mark keeps the macOS template icon crisp in both menu-bar themes.
                 .icon(tauri::include_image!("./icons/tray-icon.png"))
                 .icon_as_template(true)
                 .menu(&menu)

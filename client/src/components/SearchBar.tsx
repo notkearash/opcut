@@ -5,7 +5,6 @@ interface SearchBarProps {
   value: string;
   onChange: (v: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
-  /** Whether we're in shell mode (`!` prefix) — swaps the glyph for a shell prompt. */
   shellActive: boolean;
   onOpenSettings: () => void;
 }

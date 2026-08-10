@@ -7,24 +7,16 @@ interface NavResult {
   onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-/**
- * Arrow/Enter/Escape navigation over the current result list. Selection resets to 0
- * whenever the result set changes. The caller owns Escape (hide window) via `onEscape`.
- * `suspendSelectionReset` keeps the selection across result-set changes — the ⌥Tab
- * switcher cycles a selection the user isn't typing to filter, and the async
- * running-app refresh must not yank it back to 0.
- */
 export function useKeyboardNav(
   results: ResultRow[],
   onEscape: () => void,
   suspendSelectionReset = false,
 ): NavResult {
   const [selected, setSelected] = useState(0);
-  // Reset selection when the result set identity changes (React's recommended
-  // "adjust state during render" pattern — no effect, no cascading render).
-  const [prevResults, setPrevResults] = useState(results);
-  if (prevResults !== results) {
-    setPrevResults(results);
+  const [renderedResults, setRenderedResults] = useState(results);
+  const resultSetChanged = renderedResults !== results;
+  if (resultSetChanged) {
+    setRenderedResults(results);
     if (!suspendSelectionReset) setSelected(0);
   }
 

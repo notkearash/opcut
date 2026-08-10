@@ -1,7 +1,6 @@
-/* ── Glass panel shell ──────────────────────────────────────────────── */
 .shell {
     position: absolute;
-    inset: 14px; /* matches MARGIN in lib/layout.ts — room for the shadow */
+    inset: 14px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -11,8 +10,7 @@
     border: 1px solid var(--panel-edge);
     border-top-color: var(--panel-edge-top);
     border-radius: var(--radius-panel);
-    /* A dark contact ring under the light edge reads as thickness; the tight second
-       shadow keeps the panel planted instead of floating. */
+
     box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.07) inset,
         0 0 0 1px rgba(0, 0, 0, 0.5),
@@ -32,12 +30,11 @@
     }
 }
 
-/* ── Search bar ─────────────────────────────────────────────────────── */
 .search-bar {
     display: flex;
     align-items: center;
     gap: 12px;
-    height: 60px; /* SEARCH_H */
+    height: 60px;
     padding: 0 18px;
     flex-shrink: 0;
     position: relative;
@@ -99,9 +96,6 @@
     background: rgba(255, 255, 255, 0.12);
 }
 
-/* ── Divider ────────────────────────────────────────────────────────── */
-/* Edge-to-edge, not a fading gradient: the panel's sections should look built,
-   not blended. */
 .divider {
     height: 1px;
     flex-shrink: 0;
@@ -109,12 +103,11 @@
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
 }
 
-/* ── Result list ────────────────────────────────────────────────────── */
 .result-list {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 8px; /* LIST_VPAD */
+    padding: 8px;
     display: flex;
     flex-direction: column;
     gap: 1px;
@@ -138,9 +131,6 @@
     transition: background 0.12s ease;
 }
 
-/* ── Row media (app icon / badge / glyph) ───────────────────────────── */
-/* One 28px slot for every row so titles stay on a single optical baseline,
-   whatever the leading visual happens to be. */
 .result-media {
     flex-shrink: 0;
     display: flex;
@@ -161,9 +151,6 @@
         box-shadow 0.12s ease;
 }
 
-/* A real icon carries its own shape and shading — the slot gets out of its way, and
-   the art fills it: macOS icons ship with transparent margin, so an inset image would
-   read a size smaller than the badges beside it. */
 .result-media[data-media="icon"] {
     background: transparent;
     box-shadow: none;
@@ -172,15 +159,13 @@
     width: var(--media);
     height: var(--media);
     display: block;
-    /* macOS icons are pre-shadowed; a hair more grounds them on the glass. */
+
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
     transition:
         transform 0.12s ease,
         filter 0.12s ease;
 }
 
-/* Everything that is not an icon is a filled tile, inset by a pixel so its solid
-   square doesn't out-weigh the icons in the same column. */
 .result-media[data-media="badge"],
 .result-media[data-media="monogram"],
 .result-media[data-media="glyph"] {
@@ -189,7 +174,6 @@
     margin: 0 1px;
 }
 
-/* Monogram fallback for an app whose icon we could not rasterize. */
 .result-media[data-media="monogram"] {
     font-family: var(--font-display);
     font-size: 13px;
@@ -223,7 +207,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
-/* On app rows, dim the base text so the matched characters read clearly. */
+
 .result-item[data-kind="app"] .result-title {
     color: var(--text-dim);
 }
@@ -261,12 +245,11 @@
     font-size: 14px;
 }
 
-/* selection (keyboard + hover both resolve to .selected) */
 .result-item.selected {
     background: var(--sel-bg);
     box-shadow: inset 0 0 0 1px var(--sel-edge);
 }
-/* A short rail on the leading edge marks the selection even at a glance. */
+
 .result-item.selected::before {
     content: "";
     position: absolute;
@@ -291,12 +274,12 @@
     background: transparent;
     box-shadow: none;
 }
-/* The selected row's icon lifts very slightly — enough to register, not to jiggle. */
+
 .result-item.selected .result-icon {
     transform: scale(1.06);
     filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
 }
-/* A quitting app's icon desaturates with the rest of the row. */
+
 .result-item[data-status="terminating"] .result-icon {
     filter: saturate(0.5) brightness(0.85);
 }
@@ -306,14 +289,12 @@
         transform: none;
     }
 }
-/* ── Quit flow: the row powers down ─────────────────────────────────── */
-/* Widen the trailing slot so the ⇧⌫ hint and status orb fit cleanly. */
+
 .result-item .result-enter {
     min-width: 18px;
     width: auto;
 }
 
-/* Inline "hold ⇧⌫ to quit" affordance on the selected running-app row. */
 .kill-hint {
     display: inline-flex;
 }
@@ -328,7 +309,6 @@
     line-height: 1;
 }
 
-/* Status orb: pulsing while the quit is in flight, resolves to ✓ / ✕. */
 .kill-orb {
     display: inline-flex;
     align-items: center;
@@ -374,7 +354,6 @@
     }
 }
 
-/* The whole row reacts: fade+collapse on a clean quit, a short shake on refusal. */
 .result-item[data-status="terminated"] {
     animation: kill-powerdown 1.5s ease forwards;
 }
@@ -421,9 +400,8 @@
     }
 }
 
-/* ── Footer ─────────────────────────────────────────────────────────── */
 .footer {
-    height: 34px; /* FOOTER_H */
+    height: 34px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -467,9 +445,8 @@
     text-overflow: ellipsis;
 }
 
-/* ── Empty state ────────────────────────────────────────────────────── */
 .empty-state {
-    height: 52px; /* EMPTY_H */
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -478,7 +455,6 @@
     font-family: var(--font-mono);
 }
 
-/* ── Settings (quick slots) ─────────────────────────────────────────── */
 .settings-view {
     display: flex;
     flex-direction: column;
@@ -659,7 +635,6 @@
     flex-shrink: 0;
 }
 
-/* ── App picker overlay (used inside settings) ──────────────────────── */
 .app-picker-overlay {
     position: absolute;
     inset: 0;

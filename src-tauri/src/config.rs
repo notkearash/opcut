@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const SLOT_COUNT: usize = 9;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub name: String,
@@ -8,7 +10,7 @@ pub struct AppConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SlotConfig {
-    pub slots: [Option<AppConfig>; 9],
+    pub slots: [Option<AppConfig>; SLOT_COUNT],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,11 +19,8 @@ pub struct AppInfo {
     pub path: String,
 }
 
-/// Settings for the `!` shell route.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellConfig {
-    /// Directory shell commands run in when the query carries no inline `@ <path>`.
-    /// Stored expanded, so the UI can display it against the user's home dir.
     pub cwd: String,
 }
 

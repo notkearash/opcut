@@ -3,6 +3,8 @@ use std::fs;
 use std::process::Command;
 
 const RECENT_APP_LIMIT: usize = 128;
+const APP_DIRECTORIES: [&str; 2] = ["/Applications", "/System/Applications"];
+const FINDER_OUTSIDE_APP_DIRECTORIES: &str = "/System/Library/CoreServices/Finder.app";
 
 fn promote_recent_path(paths: &mut Vec<String>, path: &str) {
     paths.retain(|existing| existing != path);
@@ -72,8 +74,7 @@ mod recent_apps {
         autoreleasepool(|_| {
             let workspace = unsafe { NSWorkspace::sharedWorkspace() };
             let center = unsafe { workspace.notificationCenter() };
-            // The notification center retains this observer for its own lifetime.
-            let _observer = unsafe {
+            let _retained_by_notification_center = unsafe {
                 center.addObserverForName_object_queue_usingBlock(
                     Some(NSWorkspaceDidActivateApplicationNotification),
                     None,
@@ -130,15 +131,13 @@ fn collect_apps_from_dir(dir: &str, apps: &mut Vec<AppInfo>, recurse: bool) {
 
 pub fn list_installed_apps() -> Vec<AppInfo> {
     let mut apps = Vec::new();
-    for dir in ["/Applications", "/System/Applications"] {
+    for dir in APP_DIRECTORIES {
         collect_apps_from_dir(dir, &mut apps, true);
     }
-    // Finder lives outside the usual app directories; include it explicitly.
-    let finder_path = "/System/Library/CoreServices/Finder.app";
-    if std::path::Path::new(finder_path).exists() {
+    if std::path::Path::new(FINDER_OUTSIDE_APP_DIRECTORIES).exists() {
         apps.push(AppInfo {
             name: "Finder".to_string(),
-            path: finder_path.to_string(),
+            path: FINDER_OUTSIDE_APP_DIRECTORIES.to_string(),
         });
     }
     apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -179,7 +178,6 @@ pub fn list_running_apps() -> Vec<AppInfo> {
             });
         }
 
-        // Deduplicate by bundle path before applying the activation history.
         apps.sort_by(|a, b| a.path.cmp(&b.path));
         apps.dedup_by(|a, b| a.path == b.path);
         recent_apps::sort(&mut apps);
@@ -221,13 +219,8 @@ pub fn terminate_running_app(path: &str) -> Result<(), String> {
                 continue;
             }
 
-            // `terminate()` posts an async quit request (like ⌘Q) and returns
-            // whether the request was accepted. We must NOT block the main thread
-            // waiting for it to finish — this command runs on the main thread, and
-            // sleeping here freezes the run loop (so `isTerminated` never updates
-            // and the whole UI hangs). Fire the request and return; the frontend
-            // reconciles via `refreshApps`.
-            if unsafe { app.terminate() } {
+            let quit_request_accepted = unsafe { app.terminate() };
+            if quit_request_accepted {
                 return Ok(());
             }
             return Err("App declined to quit".to_string());
@@ -258,8 +251,6 @@ fn home_dir() -> String {
     std::env::var("HOME").unwrap_or_else(|_| "/".to_string())
 }
 
-/// Expand a leading `~`, then verify the directory exists. Falls back to `fallback`
-/// (also tilde-expanded), and finally to `$HOME`, so the returned path is always a real dir.
 pub fn expand_and_validate_cwd(raw: &str, fallback: &str) -> String {
     let expand = |p: &str| -> String {
         let trimmed = p.trim();
@@ -283,20 +274,19 @@ pub fn expand_and_validate_cwd(raw: &str, fallback: &str) -> String {
     home_dir()
 }
 
-/// Run an arbitrary shell command in a Ghostty window, in `cwd`. After the command exits we
-/// `exec` an interactive login shell so the window stays open and the output remains visible.
 pub fn run_shell_in_ghostty(command: &str, cwd: &str) -> Result<(), String> {
     if !std::path::Path::new("/Applications/Ghostty.app").exists() {
         return Err("Ghostty not found in /Applications".to_string());
     }
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    // `command` is raw user input — it IS the shell command, so it is interpolated unquoted.
+    let unquoted_user_command = command;
+    let keep_window_open_after_command = format!("exec {} -l", shell_quote(&shell));
     let script = format!(
-        "cd {} && {}; exec {} -l",
+        "cd {} && {}; {}",
         shell_quote(cwd),
-        command,
-        shell_quote(&shell),
+        unquoted_user_command,
+        keep_window_open_after_command,
     );
 
     Command::new("open")

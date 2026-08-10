@@ -1,11 +1,4 @@
-/**
- * Inline SVG glyphs. Stroke-based, 1.5px on a 16px grid, drawn in `currentColor` so they
- * inherit each row's state colour — text glyphs like "⌕" render at whatever weight the
- * system font happens to have, which read blurry next to real app icons.
- */
-
 interface GlyphProps {
-  /** Fallback only — the containing rule sets the real size (see `--media-glyph`). */
   size?: number;
 }
 
@@ -53,7 +46,6 @@ export function CommandGlyph(props: GlyphProps) {
   );
 }
 
-/** Fallback mark for an app whose icon macOS would not give us. */
 export function AppGlyph(props: GlyphProps) {
   return (
     <Svg {...props}>

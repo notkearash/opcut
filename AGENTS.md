@@ -19,6 +19,17 @@ Use Bun for JavaScript dependencies and scripts:
 
 TypeScript and React use ES modules, functional components, and hooks. Keep components in PascalCase files such as `SearchBar.tsx`; hooks should start with `use`, such as `useKeyboardNav.ts`; utility modules use lower camel case names such as `parseQuery.ts`. Follow the existing two-space indentation style in TSX/CSS and four-space Rust formatting. Run `bun run lint` before submitting frontend changes and `cargo fmt --manifest-path src-tauri/Cargo.toml` before submitting Rust changes.
 
+### No comments — the code explains itself
+
+This codebase contains no comments, in any language: no `//`, no `/* */`, no `///` or `//!` doc comments, no JSDoc, no CSS or HTML comments. Do not add any, and do not reintroduce ones that were removed. Anything you would have written in a comment goes into the code instead:
+
+- **Name the value, not the number.** A magic literal becomes a named constant: `COMMIT_RETRY_LIMIT`, `TERMINATED_ROW_LINGER_MS`, `CG_EVENT_FLAG_MASK_ALTERNATE`, `FOUR_FINGER_VERTICAL_MISSION_CONTROL`.
+- **Name the condition.** Extract a boolean or predicate rather than annotating an `if`: `const cursorActuallyTravelled = …`, `let key_repeat = held.swap(…)`, `isSlashKey(e)`, `optionTypedLetter(e)`.
+- **Name the block.** When a branch needs a sentence to explain it, it wants to be a function: `showFreshPrompt()`, `hideAndForgetSession()`, `highlightMatchedChars()`, `expand_and_validate_cwd()`.
+- **Name the field.** Prefer `iconBundlePath` and `matchIndicesInTitle` over `iconPath` and `matchIndices` plus a doc comment.
+- **Put explanations in tests and assert messages,** not in prose next to the code: `assert!(m.on_tab().is_some(), "a new tab starts a fresh session")`.
+- If something genuinely cannot be expressed in names — a platform quirk, a rationale for a decision — it belongs in this file, `README.md`, or the commit message, not in the source.
+
 ## Testing Guidelines
 
 There is currently no dedicated automated test script in `package.json`. For now, validate changes with `bun run lint`, `bun run build`, and targeted manual checks in `bun run dev`. For Rust-only changes, also run `cargo check --manifest-path src-tauri/Cargo.toml`. If adding tests, colocate frontend tests near the relevant component or helper and name them after the unit under test, for example `parseQuery.test.ts`.

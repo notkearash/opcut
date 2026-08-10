@@ -3,12 +3,11 @@ import SlotItem from "./SlotItem";
 
 interface SlotGridProps {
   slots: (AppConfig | null)[];
-  /** Bundle path → PNG data URI. */
-  icons: Record<string, string>;
+  iconsByBundlePath: Record<string, string>;
   onSlotClick: (index: number) => void;
 }
 
-export default function SlotGrid({ slots, icons, onSlotClick }: SlotGridProps) {
+export default function SlotGrid({ slots, iconsByBundlePath, onSlotClick }: SlotGridProps) {
   return (
     <div className="slot-grid">
       {slots.map((app, i) => (
@@ -16,7 +15,7 @@ export default function SlotGrid({ slots, icons, onSlotClick }: SlotGridProps) {
           key={i}
           index={i}
           app={app}
-          icon={app ? icons[app.path] : undefined}
+          iconDataUri={app ? iconsByBundlePath[app.path] : undefined}
           onClick={() => onSlotClick(i)}
         />
       ))}

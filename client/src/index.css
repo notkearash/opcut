@@ -1,21 +1,17 @@
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap");
 
 :root {
-    /* Typography */
     --font-display:
         "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, system-ui,
         sans-serif;
     --font-mono:
         ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
 
-    /* Refined dark glass palette — opaque enough to read as a solid instrument
-       rather than a translucent overlay, with definite edges to sit on. */
     --panel: rgba(16, 16, 19, 0.84);
     --panel-edge: rgba(255, 255, 255, 0.14);
     --panel-edge-top: rgba(255, 255, 255, 0.2);
     --hairline: rgba(255, 255, 255, 0.09);
-    /* Structural bands: the search header and the footer, so the list reads as a
-       separate surface between them. */
+
     --band-top: rgba(255, 255, 255, 0.04);
     --band-bottom: rgba(0, 0, 0, 0.2);
     --fill: rgba(255, 255, 255, 0.07);
@@ -25,28 +21,23 @@
     --text-dim: rgba(236, 236, 242, 0.58);
     --text-faint: rgba(236, 236, 242, 0.34);
 
-    /* Monochrome accent — pure light on deep black */
     --accent: #f6f6f8;
     --accent-rgb: 246, 246, 248;
     --sel-bg: rgba(var(--accent-rgb), 0.1);
     --sel-edge: rgba(var(--accent-rgb), 0.22);
 
-    /* Quit lifecycle — surfaces only while the `*` running-apps kill flow runs */
-    --live: #6ee7a8; /* app quit cleanly */
+    --live: #6ee7a8;
     --live-rgb: 110, 231, 168;
-    --kill: #ff8a8a; /* app declined to quit */
+    --kill: #ff8a8a;
     --kill-rgb: 255, 138, 138;
 
     --radius-panel: 14px;
     --radius-row: 9px;
 
-    /* One media scale for every leading visual, so nothing looks off-size next to
-       its neighbours. Icons fill the slot (their art carries built-in padding);
-       filled badges sit slightly inset so they read at the same optical weight. */
     --media: 28px;
     --media-badge: 26px;
     --media-glyph: 16px;
-    /* Compact variant for the settings rows and the app picker. */
+
     --media-compact: 22px;
     --media-glyph-compact: 14px;
 }

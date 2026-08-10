@@ -4,12 +4,11 @@ import { AppGlyph } from "./Glyphs";
 interface SlotItemProps {
   index: number;
   app: AppConfig | null;
-  /** PNG data URI for the assigned app, when loaded. */
-  icon?: string;
+  iconDataUri?: string;
   onClick: () => void;
 }
 
-export default function SlotItem({ index, app, icon, onClick }: SlotItemProps) {
+export default function SlotItem({ index, app, iconDataUri, onClick }: SlotItemProps) {
   return (
     <button
       className={`slot-item ${app ? "assigned" : "empty"}`}
@@ -17,8 +16,8 @@ export default function SlotItem({ index, app, icon, onClick }: SlotItemProps) {
     >
       <span className="slot-number">{index + 1}</span>
       <span className="slot-media">
-        {icon ? (
-          <img className="slot-icon" src={icon} alt="" draggable={false} />
+        {iconDataUri ? (
+          <img className="slot-icon" src={iconDataUri} alt="" draggable={false} />
         ) : (
           <AppGlyph />
         )}

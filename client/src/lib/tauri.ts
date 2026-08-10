@@ -5,7 +5,6 @@ export const getInstalledApps = () => invoke<AppInfo[]>("get_installed_apps");
 
 export const getRunningApps = () => invoke<AppInfo[]>("get_running_apps");
 
-/** PNG data URIs for the given bundle paths, keyed by path. */
 export const getAppIcons = (paths: string[]) =>
   invoke<Record<string, string>>("get_app_icons", { paths });
 
@@ -27,7 +26,6 @@ export const terminateRunningApp = (path: string) =>
 
 export const getShellCwd = () => invoke<string>("get_shell_cwd");
 
-/** Saves the default shell folder; resolves to the path actually stored. */
 export const setShellCwd = (path: string) =>
   invoke<string>("set_shell_cwd", { path });
 

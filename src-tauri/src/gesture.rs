@@ -33,6 +33,11 @@ mod macos {
 
     const SWIPE_DISTANCE: f32 = 0.08;
     const DIRECTION_DOMINANCE: f32 = 1.2;
+    const TOUCH_STATE_MAKE_TOUCH: u32 = 3;
+    const TOUCH_STATE_TOUCHING: u32 = 4;
+    const DO_NOT_CONSUME_EVENT: i32 = 0;
+    const THREE_FINGER_VERTICAL_OFF: i32 = 0;
+    const FOUR_FINGER_VERTICAL_MISSION_CONTROL: i32 = 2;
 
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -48,7 +53,6 @@ mod macos {
         velocity: MTPoint,
     }
 
-    /// Reverse-engineered contact layout used by macOS's private MultitouchSupport framework.
     #[repr(C)]
     #[derive(Clone, Copy)]
     struct MTTouch {
@@ -121,18 +125,17 @@ mod macos {
 
             let delta_x = centroid.0 - start.0;
             let delta_y = centroid.1 - start.1;
-            let horizontal = delta_x.abs() >= SWIPE_DISTANCE
+            let horizontal_space_switch = delta_x.abs() >= SWIPE_DISTANCE
                 && delta_x.abs() > delta_y.abs() * DIRECTION_DOMINANCE;
-            if horizontal {
-                // Do not turn a three-finger Space switch into an app-switcher gesture.
+            if horizontal_space_switch {
                 self.blocked_until_clear = true;
                 self.start = None;
                 return false;
             }
 
-            let vertical = delta_y.abs() >= SWIPE_DISTANCE
+            let vertical_app_switch = delta_y.abs() >= SWIPE_DISTANCE
                 && delta_y.abs() > delta_x.abs() * DIRECTION_DOMINANCE;
-            if vertical {
+            if vertical_app_switch {
                 self.triggered = true;
                 return true;
             }
@@ -174,20 +177,19 @@ mod macos {
         _frame: i32,
     ) -> i32 {
         if !GESTURE_ENABLED.load(Ordering::SeqCst) {
-            return 0;
+            return DO_NOT_CONSUME_EVENT;
         }
         if touches.is_null() || touch_count <= 0 {
             if let Ok(mut recognizer) = SWIPE_RECOGNIZER.lock() {
                 recognizer.reset();
             }
-            return 0;
+            return DO_NOT_CONSUME_EVENT;
         }
 
         let touches = unsafe { std::slice::from_raw_parts(touches, touch_count as usize) };
         let fingers: Vec<(f32, f32)> = touches
             .iter()
-            // 3 = make touch, 4 = touching. Ignore hover, lift and linger contacts.
-            .filter(|touch| matches!(touch.state, 3 | 4))
+            .filter(|touch| matches!(touch.state, TOUCH_STATE_MAKE_TOUCH | TOUCH_STATE_TOUCHING))
             .map(|touch| (touch.normalized.position.x, touch.normalized.position.y))
             .collect();
 
@@ -208,9 +210,7 @@ mod macos {
             }
         }
 
-        // The macOS gesture is released through its saved preference mapping; raw contact
-        // callbacks should never consume events needed by scrolling or four-finger gestures.
-        0
+        DO_NOT_CONSUME_EVENT
     }
 
     fn register_raw_trackpad_monitor(app: &AppHandle) -> Result<(), String> {
@@ -238,8 +238,7 @@ mod macos {
             }
         }
 
-        // Deliberately do not CFRelease the created list. Keeping its devices alive for the
-        // process avoids MultitouchSupport teardown races with in-flight callbacks.
+        let _devices_leaked_to_stay_alive_for_the_process = devices;
 
         if started == 0 {
             Err("No multitouch trackpad could be started".to_string())
@@ -349,19 +348,31 @@ mod macos {
 
     fn apply_hijack() -> Result<bool, String> {
         let mut changed = false;
-
-        // Free the vertical three-finger swipe for AppKit and keep the native macOS
-        // overview gestures available with four fingers.
-        changed |= write_preference(BUILTIN_TRACKPAD_DOMAIN, THREE_FINGER_VERTICAL, 0)?;
-        changed |= write_preference(BUILTIN_TRACKPAD_DOMAIN, FOUR_FINGER_VERTICAL, 2)?;
-        changed |= write_preference(BLUETOOTH_TRACKPAD_DOMAIN, THREE_FINGER_VERTICAL, 0)?;
-        changed |= write_preference(BLUETOOTH_TRACKPAD_DOMAIN, FOUR_FINGER_VERTICAL, 2)?;
+        changed |= write_preference(
+            BUILTIN_TRACKPAD_DOMAIN,
+            THREE_FINGER_VERTICAL,
+            THREE_FINGER_VERTICAL_OFF,
+        )?;
+        changed |= write_preference(
+            BUILTIN_TRACKPAD_DOMAIN,
+            FOUR_FINGER_VERTICAL,
+            FOUR_FINGER_VERTICAL_MISSION_CONTROL,
+        )?;
+        changed |= write_preference(
+            BLUETOOTH_TRACKPAD_DOMAIN,
+            THREE_FINGER_VERTICAL,
+            THREE_FINGER_VERTICAL_OFF,
+        )?;
+        changed |= write_preference(
+            BLUETOOTH_TRACKPAD_DOMAIN,
+            FOUR_FINGER_VERTICAL,
+            FOUR_FINGER_VERTICAL_MISSION_CONTROL,
+        )?;
         Ok(changed)
     }
 
     fn restart_dock_if_needed(changed: bool) {
         if changed {
-            // Dock owns the system Mission Control gesture. It relaunches automatically.
             let _ = Command::new("/usr/bin/killall").arg("Dock").status();
         }
     }
@@ -421,8 +432,8 @@ mod macos {
         set_runtime_enabled(is_enabled);
 
         if is_enabled {
-            // Re-assert the mapping after login/relaunch without replacing the original backup.
-            if stored_backup(app).is_none() {
+            let no_backup_from_a_previous_run = stored_backup(app).is_none();
+            if no_backup_from_a_previous_run {
                 save_backup(app, &TrackpadPreferences::read())?;
             }
             restart_dock_if_needed(apply_hijack()?);
