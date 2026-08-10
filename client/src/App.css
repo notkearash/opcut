@@ -61,11 +61,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 19px;
     color: var(--text-faint);
     transition: color 0.18s ease;
     width: 18px;
     height: 18px;
+}
+.search-bar[data-shell="true"] .search-glyph {
+    color: var(--text-dim);
 }
 
 /* ── AI animation (active while typing `?`) ─────────────────────────── */
@@ -197,7 +199,10 @@
     transition: background 0.12s ease;
 }
 
-.result-badge {
+/* ── Row media (app icon / badge / glyph) ───────────────────────────── */
+/* One 28px slot for every row so titles stay on a single optical baseline,
+   whatever the leading visual happens to be. */
+.result-media {
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -206,13 +211,44 @@
     height: 28px;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
     color: var(--text-dim);
     font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     transition:
         background 0.12s ease,
-        color 0.12s ease;
+        color 0.12s ease,
+        box-shadow 0.12s ease;
+}
+
+/* A real icon carries its own shape and shading — the slot gets out of its way. */
+.result-media[data-media="icon"] {
+    background: transparent;
+    box-shadow: none;
+}
+.result-icon {
+    width: 26px;
+    height: 26px;
+    display: block;
+    /* macOS icons are pre-shadowed; a hair more grounds them on the glass. */
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+    transition:
+        transform 0.12s ease,
+        filter 0.12s ease;
+}
+
+/* Monogram fallback for an app whose icon we could not rasterize. */
+.result-media[data-media="monogram"] {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--text-dim);
+}
+
+.result-media[data-media="glyph"] {
+    color: var(--text-faint);
 }
 
 .result-text {
@@ -275,13 +311,33 @@
     background: var(--sel-bg);
     box-shadow: inset 0 0 0 1px var(--sel-edge);
 }
-.result-item.selected .result-badge {
-    background: rgba(var(--accent-rgb), 0.18);
+.result-item.selected .result-media {
+    background: rgba(var(--accent-rgb), 0.14);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.16);
     color: var(--accent);
 }
-.result-item[data-kind="agent"] .result-badge {
+.result-item.selected .result-media[data-media="icon"] {
+    background: transparent;
+    box-shadow: none;
+}
+/* The selected row's icon lifts very slightly — enough to register, not to jiggle. */
+.result-item.selected .result-icon {
+    transform: scale(1.06);
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+}
+.result-item[data-kind="agent"] .result-media {
     font-size: 11px;
     letter-spacing: -0.5px;
+}
+/* A quitting app's icon desaturates with the rest of the row. */
+.result-item[data-status="terminating"] .result-icon {
+    filter: saturate(0.5) brightness(0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .result-item.selected .result-icon {
+        transform: none;
+    }
 }
 /* ── Quit flow: the row powers down ─────────────────────────────────── */
 /* Widen the trailing slot so the ⇧⌫ hint and status orb fit cleanly. */
@@ -508,7 +564,7 @@
 .slot-item {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     height: 42px;
     padding: 0 12px;
     border: none;
@@ -539,16 +595,73 @@
     color: var(--text-dim);
     flex-shrink: 0;
 }
+.slot-media {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--text-faint);
+}
+.slot-icon {
+    width: 22px;
+    height: 22px;
+    display: block;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+.slot-item.empty .slot-media {
+    opacity: 0.55;
+}
+
 .slot-app-name {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.slot-item.assigned .slot-app-name {
+.slot-item.assigned .slot-media {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--text-faint);
+}
+.slot-icon {
+    width: 22px;
+    height: 22px;
+    display: block;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+.slot-item.empty .slot-media {
+    opacity: 0.55;
+}
+
+.slot-app-name {
     color: var(--text);
 }
-.slot-item.empty .slot-app-name {
+.slot-item.empty .slot-media {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--text-faint);
+}
+.slot-icon {
+    width: 22px;
+    height: 22px;
+    display: block;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+.slot-item.empty .slot-media {
+    opacity: 0.55;
+}
+
+.slot-app-name {
     color: var(--text-faint);
 }
 .slot-shortcut {
@@ -622,9 +735,11 @@
     padding: 0 6px 6px;
 }
 .app-picker-item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     width: 100%;
-    padding: 8px 10px;
+    padding: 7px 10px;
     border: none;
     border-radius: 7px;
     background: transparent;
@@ -637,6 +752,26 @@
 }
 .app-picker-item:hover {
     background: var(--sel-bg);
+}
+.app-picker-media {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--text-faint);
+}
+.app-picker-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+.app-picker-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .app-picker-empty {
     padding: 20px;

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import type { AppInfo, ResultRow } from "./types";
 import { useAppData } from "./hooks/useAppData";
+import { useAppIcons } from "./hooks/useAppIcons";
 import { useKeyboardNav } from "./hooks/useKeyboardNav";
 import { parseQuery } from "./lib/parseQuery";
 import { fuzzySearch } from "./lib/fuzzy";
@@ -80,6 +81,7 @@ function App() {
     threeFingerAppSwitcherEnabled,
     toggleThreeFingerAppSwitcher,
   } = useAppData();
+  const { icons, iconsEnabled, toggleIcons, requestIcons } = useAppIcons();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<View>("search");
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
@@ -243,6 +245,17 @@ function App() {
           },
         },
         {
+          id: "icons",
+          title: iconsEnabled ? "Hide app icons" : "Show app icons",
+          subtitle: iconsEnabled
+            ? "show a letter mark instead of each app's icon"
+            : "show each app's real macOS icon in the results",
+          run: () => {
+            toggleIcons();
+            setQuery("");
+          },
+        },
+        {
           id: "gesture",
           title: threeFingerAppSwitcherEnabled
             ? "Disable three-finger app switcher"
@@ -278,6 +291,7 @@ function App() {
           kind: "app" as const,
           id: m.item.path,
           title: m.item.name,
+          iconPath: m.item.path,
           matchIndices: m.indices,
           onActivate: () => launchOrFocusApp(m.item.path).finally(hideAndReset),
         }));
@@ -297,6 +311,7 @@ function App() {
             kind: "app" as const,
             id: `running-${m.item.path}`,
             title: killTitle(status) ?? m.item.name,
+            iconPath: m.item.path,
             subtitle: status ? m.item.name : undefined,
             matchIndices: status ? undefined : m.indices,
             status,
@@ -317,6 +332,7 @@ function App() {
         kind: "slot" as const,
         id: `slot-${i}`,
         badge: String(i + 1),
+        iconPath: app.path,
         title: app.name,
         subtitle: `⌥${i + 1}`,
         onActivate: () => launchOrFocusApp(app.path).finally(hideAndReset),
@@ -337,7 +353,27 @@ function App() {
     toggleSlotShortcuts,
     threeFingerAppSwitcherEnabled,
     toggleThreeFingerAppSwitcher,
+    iconsEnabled,
+    toggleIcons,
   ]);
+
+  // Fetch the icons the current result set needs. Keyed on the joined paths so a query that
+  // reshuffles the same apps doesn't re-request, and skipped entirely when icons are off.
+  const iconPathKey = useMemo(
+    () =>
+      iconsEnabled
+        ? results
+            .map((r) => r.iconPath)
+            .filter((p): p is string => Boolean(p))
+            .join("\u0000")
+        : "",
+    [results, iconsEnabled],
+  );
+
+  useEffect(() => {
+    if (!iconPathKey) return;
+    requestIcons(iconPathKey.split("\u0000"));
+  }, [iconPathKey, requestIcons]);
 
   const { selected, setSelected, onKeyDown } = useKeyboardNav(
     results,
@@ -552,6 +588,8 @@ function App() {
           onSlotsChange={setSlots}
           pickerSlot={pickerSlot}
           onPickerSlotChange={setPickerSlot}
+          icons={iconsEnabled ? icons : {}}
+          requestIcons={requestIcons}
           onClose={() => {
             setView("search");
             setPickerSlot(null);
@@ -582,7 +620,12 @@ function App() {
       {results.length > 0 && (
         <>
           <div className="divider" />
-          <ResultList rows={results} selected={selected} onHover={setSelected} />
+          <ResultList
+            rows={results}
+            selected={selected}
+            icons={iconsEnabled ? icons : {}}
+            onHover={setSelected}
+          />
           <Footer count={results.length} killHint={killHint} />
         </>
       )}

@@ -2,6 +2,7 @@ mod app_manager;
 mod commands;
 mod config;
 mod gesture;
+mod icons;
 mod switcher;
 
 use config::SlotConfig;
@@ -183,6 +184,15 @@ pub(crate) fn slot_shortcuts_enabled(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+/// Whether result rows show real app icons (stored flag, default on).
+pub(crate) fn icons_enabled(app: &AppHandle) -> bool {
+    let store = app.store("config.json").expect("failed to access store");
+    store
+        .get("icons_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+}
+
 /// Register the always-on ⌥Space launcher toggle.
 fn register_toggle_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let toggle: Shortcut = "Alt+Space".parse()?;
@@ -294,6 +304,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_installed_apps,
             commands::get_running_apps,
+            commands::get_app_icons,
+            commands::get_icons_enabled,
+            commands::set_icons_enabled,
             commands::get_slot_config,
             commands::set_slot_config,
             commands::launch_or_focus_app,

@@ -1,8 +1,11 @@
 import type { ResultRow } from "../types";
+import { AppGlyph, CommandGlyph, ShellGlyph } from "./Glyphs";
 
 interface ResultItemProps {
   row: ResultRow;
   selected: boolean;
+  /** PNG data URI for `row.iconPath`, once it has loaded. */
+  icon?: string;
   onHover: () => void;
   onActivate: () => void;
 }
@@ -22,9 +25,51 @@ function highlight(title: string, indices?: number[]) {
   );
 }
 
+/**
+ * Leading visual: a real app icon where we have one, otherwise a shape that reads at the
+ * same size — a glyph for the synthetic rows, a monogram for an app we couldn't rasterize.
+ */
+function Media({ row, icon }: { row: ResultRow; icon?: string }) {
+  if (icon) {
+    return (
+      <span className="result-media" data-media="icon">
+        <img className="result-icon" src={icon} alt="" draggable={false} />
+      </span>
+    );
+  }
+  if (row.badge) {
+    return (
+      <span className="result-media" data-media="badge">
+        {row.badge}
+      </span>
+    );
+  }
+  if (row.kind === "command") {
+    return (
+      <span className="result-media" data-media="glyph">
+        <CommandGlyph />
+      </span>
+    );
+  }
+  if (row.kind === "shell") {
+    return (
+      <span className="result-media" data-media="glyph">
+        <ShellGlyph />
+      </span>
+    );
+  }
+  const initial = [...row.title.trim()][0];
+  return (
+    <span className="result-media" data-media={initial ? "monogram" : "glyph"}>
+      {initial ? initial.toUpperCase() : <AppGlyph />}
+    </span>
+  );
+}
+
 export default function ResultItem({
   row,
   selected,
+  icon,
   onHover,
   onActivate,
 }: ResultItemProps) {
@@ -36,7 +81,7 @@ export default function ResultItem({
       onMouseMove={onHover}
       onClick={onActivate}
     >
-      {row.badge && <span className="result-badge">{row.badge}</span>}
+      <Media row={row} icon={icon} />
       <span className="result-text">
         <span className="result-title">{highlight(row.title, row.matchIndices)}</span>
         {row.subtitle && <span className="result-subtitle">{row.subtitle}</span>}

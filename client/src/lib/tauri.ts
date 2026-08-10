@@ -5,6 +5,15 @@ export const getInstalledApps = () => invoke<AppInfo[]>("get_installed_apps");
 
 export const getRunningApps = () => invoke<AppInfo[]>("get_running_apps");
 
+/** PNG data URIs for the given bundle paths, keyed by path. */
+export const getAppIcons = (paths: string[]) =>
+  invoke<Record<string, string>>("get_app_icons", { paths });
+
+export const getIconsEnabled = () => invoke<boolean>("get_icons_enabled");
+
+export const setIconsEnabled = (enabled: boolean) =>
+  invoke<boolean>("set_icons_enabled", { enabled });
+
 export const getSlotConfig = () => invoke<SlotConfig>("get_slot_config");
 
 export const setSlotConfig = (slotIndex: number, appConfig: AppConfig | null) =>

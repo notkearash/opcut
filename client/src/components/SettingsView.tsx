@@ -12,6 +12,9 @@ interface SettingsViewProps {
    *  global ⌥1–9 shortcut (delivered via the `assign-slot` event) can open it. */
   pickerSlot: number | null;
   onPickerSlotChange: (slot: number | null) => void;
+  /** Bundle path → PNG data URI, and the loader for paths not yet fetched. */
+  icons: Record<string, string>;
+  requestIcons: (paths: string[]) => void;
   onClose: () => void;
 }
 
@@ -22,6 +25,8 @@ export default function SettingsView({
   onSlotsChange,
   pickerSlot,
   onPickerSlotChange,
+  icons,
+  requestIcons,
   onClose,
 }: SettingsViewProps) {
   // Esc backs out. ⌥1–9 is a global shortcut handled in Rust (it never reaches
@@ -55,12 +60,14 @@ export default function SettingsView({
           esc
         </button>
       </div>
-      <SlotGrid slots={slots} onSlotClick={onPickerSlotChange} />
+      <SlotGrid slots={slots} icons={icons} onSlotClick={onPickerSlotChange} />
       {pickerSlot !== null && (
         <AppPicker
           key={pickerSlot}
           apps={apps}
           slotIndex={pickerSlot}
+          icons={icons}
+          requestIcons={requestIcons}
           onSelect={handleSelect}
           onClose={() => onPickerSlotChange(null)}
         />

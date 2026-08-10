@@ -36,6 +36,8 @@ export interface ResultRow {
   matchIndices?: number[];
   /** Glyph/badge shown at the leading edge (e.g. slot number, agent id). */
   badge?: string;
+  /** Bundle path whose macOS icon represents this row, when it has one. */
+  iconPath?: string;
   status?: "terminating" | "terminated" | "failed";
   onActivate: () => void | Promise<void>;
   onKill?: () => void | Promise<void>;

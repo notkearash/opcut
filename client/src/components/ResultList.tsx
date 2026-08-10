@@ -5,10 +5,12 @@ import ResultItem from "./ResultItem";
 interface ResultListProps {
   rows: ResultRow[];
   selected: number;
+  /** Bundle path → PNG data URI; rows without an entry fall back to a glyph. */
+  icons: Record<string, string>;
   onHover: (i: number) => void;
 }
 
-export default function ResultList({ rows, selected, onHover }: ResultListProps) {
+export default function ResultList({ rows, selected, icons, onHover }: ResultListProps) {
   const selectedRef = useRef<HTMLDivElement>(null);
 
   // Keep the selected row in view during keyboard navigation.
@@ -25,6 +27,7 @@ export default function ResultList({ rows, selected, onHover }: ResultListProps)
           key={row.id}
           row={row}
           selected={i === selected}
+          icon={row.iconPath ? icons[row.iconPath] : undefined}
           onHover={() => onHover(i)}
           onActivate={row.onActivate}
         />

@@ -1,16 +1,26 @@
 import { useState, useEffect, useRef } from "react";
 import type { AppInfo } from "../types";
+import { AppGlyph } from "./Glyphs";
 
 interface AppPickerProps {
   apps: AppInfo[];
   slotIndex: number;
+  /** Bundle path → PNG data URI. */
+  icons: Record<string, string>;
+  /** Loads icons for the paths currently on screen. */
+  requestIcons: (paths: string[]) => void;
   onSelect: (app: AppInfo | null) => void;
   onClose: () => void;
 }
 
+/** How far down the filtered list we pre-load icons — enough to cover the scroll viewport. */
+const ICON_LOOKAHEAD = 24;
+
 export default function AppPicker({
   apps,
   slotIndex,
+  icons,
+  requestIcons,
   onSelect,
   onClose,
 }: AppPickerProps) {
@@ -24,6 +34,14 @@ export default function AppPicker({
   const filtered = apps.filter((app) =>
     app.name.toLowerCase().includes(search.toLowerCase()),
   );
+
+  const lookahead = filtered
+    .slice(0, ICON_LOOKAHEAD)
+    .map((app) => app.path)
+    .join("\u0000");
+  useEffect(() => {
+    if (lookahead) requestIcons(lookahead.split("\u0000"));
+  }, [lookahead, requestIcons]);
 
   return (
     <div className="app-picker-overlay" onClick={onClose}>
@@ -61,7 +79,19 @@ export default function AppPicker({
               className="app-picker-item"
               onClick={() => onSelect(app)}
             >
-              {app.name}
+              <span className="app-picker-media">
+                {icons[app.path] ? (
+                  <img
+                    className="app-picker-icon"
+                    src={icons[app.path]}
+                    alt=""
+                    draggable={false}
+                  />
+                ) : (
+                  <AppGlyph size={14} />
+                )}
+              </span>
+              <span className="app-picker-name">{app.name}</span>
             </button>
           ))}
           {filtered.length === 0 && (

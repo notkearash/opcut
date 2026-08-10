@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import { SearchGlyph, ShellGlyph } from "./Glyphs";
 
 interface SearchBarProps {
   value: string;
@@ -25,9 +26,9 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           {aiActive ? (
             <span className="ai-orb" />
           ) : shellActive ? (
-            "❯"
+            <ShellGlyph size={17} />
           ) : (
-            "⌕"
+            <SearchGlyph size={17} />
           )}
         </span>
         {agentLabel && <span className="agent-chip">{agentLabel}</span>}

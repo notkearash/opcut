@@ -1,5 +1,7 @@
 use crate::app_manager;
 use crate::config::{AgentConfig, AppConfig, AppInfo, SlotConfig};
+use crate::icons;
+use std::collections::HashMap;
 use tauri_plugin_store::StoreExt;
 
 #[tauri::command]
@@ -10,6 +12,28 @@ pub fn get_installed_apps() -> Vec<AppInfo> {
 #[tauri::command]
 pub fn get_running_apps() -> Vec<AppInfo> {
     app_manager::list_running_apps()
+}
+
+/// PNG data URIs for the given bundle paths. `async` on purpose: rasterizing an icon costs
+/// ~15ms, so this runs on the async runtime instead of blocking the main thread (and thus
+/// the panel) while a screenful of icons is produced. Results are memoized per path.
+#[tauri::command]
+pub async fn get_app_icons(paths: Vec<String>) -> HashMap<String, String> {
+    icons::icons_for_paths(&paths)
+}
+
+#[tauri::command]
+pub fn get_icons_enabled(app_handle: tauri::AppHandle) -> bool {
+    crate::icons_enabled(&app_handle)
+}
+
+#[tauri::command]
+pub fn set_icons_enabled(app_handle: tauri::AppHandle, enabled: bool) -> bool {
+    let store = app_handle
+        .store("config.json")
+        .expect("failed to access store");
+    store.set("icons_enabled", serde_json::json!(enabled));
+    enabled
 }
 
 #[tauri::command]
