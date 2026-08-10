@@ -44,23 +44,6 @@
     background: var(--band-top);
 }
 
-/* static warm→pink hairline while an agent route is active (no loading motion) */
-.search-bar[data-agent="true"]::after {
-    content: "";
-    position: absolute;
-    left: 16px;
-    right: 16px;
-    bottom: 0;
-    height: 1px;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(var(--ai-warm-rgb), 0.85) 30%,
-        rgba(var(--ai-pink-rgb), 0.85) 70%,
-        transparent
-    );
-}
-
 .search-glyph {
     display: flex;
     align-items: center;
@@ -76,56 +59,6 @@
 }
 .search-bar[data-shell="true"] .search-glyph {
     color: var(--text-dim);
-}
-
-/* ── AI animation (active while typing `?`) ─────────────────────────── */
-.ai-orb {
-    position: relative;
-    display: inline-block;
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    background: radial-gradient(
-        circle at 32% 30%,
-        #fff,
-        var(--ai-warm) 38%,
-        var(--ai-pink) 78%
-    );
-    animation: ai-pulse 1.8s ease-in-out infinite;
-}
-@keyframes ai-pulse {
-    0%,
-    100% {
-        transform: scale(0.9);
-        box-shadow:
-            0 0 5px rgba(var(--ai-warm-rgb), 0.4),
-            0 0 9px rgba(var(--ai-pink-rgb), 0.25);
-    }
-    50% {
-        transform: scale(1.08);
-        box-shadow:
-            0 0 11px rgba(var(--ai-warm-rgb), 0.7),
-            0 0 18px rgba(var(--ai-pink-rgb), 0.5);
-    }
-}
-
-.agent-chip {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: lowercase;
-    color: var(--ai-warm);
-    background: linear-gradient(
-        90deg,
-        rgba(var(--ai-warm-rgb), 0.14),
-        rgba(var(--ai-pink-rgb), 0.14)
-    );
-    border: 1px solid rgba(var(--ai-pink-rgb), 0.32);
-    padding: 3px 8px;
-    border-radius: 7px;
-    white-space: nowrap;
-    flex-shrink: 0;
 }
 
 .search-input {
@@ -362,10 +295,6 @@
 .result-item.selected .result-icon {
     transform: scale(1.06);
     filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
-}
-.result-item[data-kind="agent"] .result-media {
-    font-size: 11px;
-    letter-spacing: -0.5px;
 }
 /* A quitting app's icon desaturates with the rest of the row. */
 .result-item[data-status="terminating"] .result-icon {

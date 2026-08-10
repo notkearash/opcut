@@ -283,49 +283,6 @@ pub fn expand_and_validate_cwd(raw: &str, fallback: &str) -> String {
     home_dir()
 }
 
-/// Launch a coding-agent CLI interactively in Ghostty, in `cwd`, with `prompt` as its argument.
-///
-/// On macOS the only reliable way to open a Ghostty terminal from the CLI is via
-/// `open -na Ghostty.app --args …`; direct `ghostty -e` does not spawn a window.
-pub fn run_agent_in_ghostty(
-    program: &str,
-    args_before: &[String],
-    prompt: &str,
-    cwd: &str,
-    use_cd_fallback: bool,
-) -> Result<(), String> {
-    if !std::path::Path::new("/Applications/Ghostty.app").exists() {
-        return Err("Ghostty not found in /Applications".to_string());
-    }
-
-    let mut cmd = Command::new("open");
-    cmd.arg("-n").arg("-a").arg("Ghostty").arg("--args");
-
-    if use_cd_fallback {
-        // Build a single shell command so `cd` runs before the agent. Quote via single-quotes
-        // and escape any embedded single quotes.
-        let mut shell_cmd = format!("cd {} && exec {}", shell_quote(cwd), shell_quote(program));
-        for a in args_before {
-            shell_cmd.push(' ');
-            shell_cmd.push_str(&shell_quote(a));
-        }
-        shell_cmd.push(' ');
-        shell_cmd.push_str(&shell_quote(prompt));
-        cmd.arg("-e").arg("/bin/sh").arg("-lc").arg(shell_cmd);
-    } else {
-        cmd.arg(format!("--working-directory={}", cwd));
-        cmd.arg("-e").arg(program);
-        for a in args_before {
-            cmd.arg(a);
-        }
-        cmd.arg(prompt);
-    }
-
-    cmd.spawn()
-        .map_err(|e| format!("Failed to launch Ghostty: {}", e))?;
-    Ok(())
-}
-
 /// Run an arbitrary shell command in a Ghostty window, in `cwd`. After the command exits we
 /// `exec` an interactive login shell so the window stays open and the output remains visible.
 pub fn run_shell_in_ghostty(command: &str, cwd: &str) -> Result<(), String> {

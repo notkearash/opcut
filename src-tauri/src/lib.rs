@@ -5,7 +5,7 @@ mod gesture;
 mod icons;
 mod switcher;
 
-use config::SlotConfig;
+use config::{ShellConfig, SlotConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{
@@ -184,6 +184,16 @@ pub(crate) fn slot_shortcuts_enabled(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+/// Directory `!` shell commands run in when the query has no inline `@ <path>`.
+pub(crate) fn shell_cwd(app: &AppHandle) -> String {
+    let store = app.store("config.json").expect("failed to access store");
+    store
+        .get("shell_config")
+        .and_then(|v| serde_json::from_value::<ShellConfig>(v).ok())
+        .unwrap_or_default()
+        .cwd
+}
+
 /// Whether result rows show real app icons (stored flag, default on).
 pub(crate) fn icons_enabled(app: &AppHandle) -> bool {
     let store = app.store("config.json").expect("failed to access store");
@@ -311,10 +321,9 @@ pub fn run() {
             commands::set_slot_config,
             commands::launch_or_focus_app,
             commands::terminate_running_app,
-            commands::get_agent_config,
-            commands::set_agent_config,
-            commands::run_agent_query,
             commands::run_shell_command,
+            commands::get_shell_cwd,
+            commands::set_shell_cwd,
             commands::get_slot_shortcuts_enabled,
             commands::set_slot_shortcuts_enabled,
             commands::get_three_finger_app_switcher_enabled,

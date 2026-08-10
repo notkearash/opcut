@@ -14,13 +14,16 @@
   <img src="https://img.shields.io/github/v/release/notkearash/opcut?style=flat-square" />
 </p>
 
-## One key, four prefixes
+## One key, three prefixes
 
 Tap <kbd>⌥</kbd>, start typing to launch — or lead with a prefix:
 
 <p align="center">
-  <img src="assets/prefixes.svg" width="880" alt="Prefixes: / running apps, ? agents, > commands, ! shell" />
+  <img src="assets/prefixes.svg" width="880" alt="Prefixes: / running apps, > commands, ! shell" />
 </p>
+
+Shell commands run in a folder you set once — `> cwd ~/src` — or in a folder named inline
+with `! git status @ ~/other/repo`.
 
 ## Switch without thinking
 

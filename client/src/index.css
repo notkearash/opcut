@@ -31,12 +31,6 @@
     --sel-bg: rgba(var(--accent-rgb), 0.1);
     --sel-edge: rgba(var(--accent-rgb), 0.22);
 
-    /* AI accent — warm yellow→pink, surfaces only while `?` is active */
-    --ai-warm: #ffd56b;
-    --ai-warm-rgb: 255, 213, 107;
-    --ai-pink: #ff7ab8;
-    --ai-pink-rgb: 255, 122, 184;
-
     /* Quit lifecycle — surfaces only while the `*` running-apps kill flow runs */
     --live: #6ee7a8; /* app quit cleanly */
     --live-rgb: 110, 231, 168;

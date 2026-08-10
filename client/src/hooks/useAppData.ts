@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { homeDir } from "@tauri-apps/api/path";
-import type { AgentConfig, AppConfig, AppInfo } from "../types";
+import type { AppConfig, AppInfo } from "../types";
 import {
-  getAgentConfig,
   getInstalledApps,
   getRunningApps,
   getSlotConfig,
+  getShellCwd,
   getSlotShortcutsEnabled,
   getThreeFingerAppSwitcherEnabled,
+  setShellCwd,
   setThreeFingerAppSwitcherEnabled,
   setSlotShortcutsEnabled,
 } from "../lib/tauri";
@@ -18,7 +19,10 @@ export interface AppData {
   refreshApps: () => Promise<void>;
   slots: (AppConfig | null)[];
   setSlots: (slots: (AppConfig | null)[]) => void;
-  agentConfig: AgentConfig | null;
+  /** Folder `!` shell commands run in unless the query names one inline. */
+  shellCwd: string;
+  /** Persist a new default shell folder; resolves to the path actually stored. */
+  saveShellCwd: (path: string) => Promise<string>;
   home: string;
   /** Whether the global ⌥1–9 quick-slot shortcuts are active. */
   slotShortcutsEnabled: boolean;
@@ -30,12 +34,12 @@ export interface AppData {
   toggleThreeFingerAppSwitcher: () => Promise<void>;
 }
 
-/** Loads installed apps, slot config, agent config and the home dir once on mount. */
+/** Loads installed apps, slot config, the shell folder and the home dir once on mount. */
 export function useAppData(): AppData {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [runningApps, setRunningApps] = useState<AppInfo[]>([]);
   const [slots, setSlots] = useState<(AppConfig | null)[]>(Array(9).fill(null));
-  const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
+  const [shellCwd, setShellCwdState] = useState("~");
   const [home, setHome] = useState("~");
   const [slotShortcutsEnabled, setSlotShortcutsEnabledState] = useState(true);
   const [threeFingerAppSwitcherEnabled, setThreeFingerAppSwitcherEnabledState] =
@@ -52,6 +56,12 @@ export function useAppData(): AppData {
     [],
   );
 
+  const saveShellCwd = useCallback(async (path: string) => {
+    const resolved = await setShellCwd(path);
+    setShellCwdState(resolved);
+    return resolved;
+  }, []);
+
   const toggleSlotShortcuts = useCallback(async () => {
     const next = await setSlotShortcutsEnabled(!slotShortcutsEnabled);
     setSlotShortcutsEnabledState(next);
@@ -67,7 +77,7 @@ export function useAppData(): AppData {
   useEffect(() => {
     refreshApps();
     getSlotConfig().then((c) => setSlots(c.slots));
-    getAgentConfig().then(setAgentConfig);
+    getShellCwd().then(setShellCwdState);
     getSlotShortcutsEnabled().then(setSlotShortcutsEnabledState);
     getThreeFingerAppSwitcherEnabled().then(
       setThreeFingerAppSwitcherEnabledState,
@@ -81,7 +91,8 @@ export function useAppData(): AppData {
     refreshApps,
     slots,
     setSlots,
-    agentConfig,
+    shellCwd,
+    saveShellCwd,
     home,
     slotShortcutsEnabled,
     toggleSlotShortcuts,

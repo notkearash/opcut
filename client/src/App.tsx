@@ -10,7 +10,6 @@ import { parseQuery } from "./lib/parseQuery";
 import { fuzzySearch } from "./lib/fuzzy";
 import {
   launchOrFocusApp,
-  runAgentQuery,
   runShellCommand,
   switcherCancel,
   switcherEnterSearch,
@@ -27,6 +26,8 @@ import SettingsView from "./components/SettingsView";
 import "./App.css";
 
 type View = "search" | "settings";
+/** `>` words that open the shell-folder setting. */
+const CWD_COMMAND_IDS = ["cwd", "folder", "dir"];
 type KillStatus = "terminating" | "terminated" | "failed";
 /** ⌥Tab switcher session: "cycling" = releasing Option focuses the highlighted app;
  *  "search" = `/` was pressed, release is disarmed and the user is typing a query. */
@@ -74,7 +75,8 @@ function App() {
     refreshApps,
     slots,
     setSlots,
-    agentConfig,
+    shellCwd,
+    saveShellCwd,
     home,
     slotShortcutsEnabled,
     toggleSlotShortcuts,
@@ -140,53 +142,11 @@ function App() {
   // --- query parsing & result building -------------------------------------
   const parsed = useMemo(
     () =>
-      parseQuery(query, {
-        homeDir: home,
-        defaultCwd: agentConfig?.default_cwd ?? "~",
-        agents: agentConfig?.agents ?? [],
-      }),
-    [query, home, agentConfig],
+      parseQuery(query, { homeDir: home, defaultCwd: shellCwd }),
+    [query, home, shellCwd],
   );
 
   const results = useMemo<ResultRow[]>(() => {
-    if (parsed.kind === "agent") {
-      const cwdLabel = parsed.cwd.replace(home, "~");
-      return [
-        {
-          kind: "agent",
-          id: "agent-run",
-          badge: `?${parsed.agentId}`,
-          title: parsed.prompt || `Open ${parsed.label}`,
-          subtitle: `${parsed.label} · ${cwdLabel}${parsed.cwdSource === "default" ? " (default)" : ""}`,
-          onActivate: () =>
-            runAgentQuery(parsed.agentId, parsed.prompt, parsed.cwd).finally(
-              hideAndReset,
-            ),
-        },
-      ];
-    }
-
-    if (parsed.kind === "agent-menu") {
-      const agents = agentConfig?.agents ?? [];
-      return agents
-        .filter(
-          (a) =>
-            a.id.startsWith(parsed.partial) ||
-            a.label.toLowerCase().startsWith(parsed.partial),
-        )
-        .map((a) => ({
-          kind: "agent" as const,
-          id: `agent-menu-${a.id}`,
-          badge: `?${a.id}`,
-          title: a.label,
-          subtitle: `coding agent · runs ${a.program}`,
-          onActivate: () => {
-            setQuery(`?${a.id} `);
-            inputRef.current?.focus();
-          },
-        }));
-    }
-
     if (parsed.kind === "shell") {
       const cwdLabel = parsed.cwd.replace(home, "~");
       if (!parsed.command) {
@@ -215,6 +175,32 @@ function App() {
     }
 
     if (parsed.kind === "command-menu") {
+      // `>cwd <path>` takes an argument, so it can't be a plain menu entry: with a path
+      // typed it saves, without one it seeds the query so the path can be typed inline.
+      if (CWD_COMMAND_IDS.includes(parsed.head)) {
+        const arg = parsed.arg;
+        return [
+          {
+            kind: "command" as const,
+            id: "cmd-cwd",
+            badge: "›",
+            title: arg
+              ? `Set shell folder to ${arg}`
+              : `Shell folder · ${shellCwd.replace(home, "~")}`,
+            subtitle: arg
+              ? "saved for every ! command · ↵ to confirm"
+              : "type a path after the command, e.g. > cwd ~/src",
+            onActivate: arg
+              ? () => {
+                  saveShellCwd(arg).finally(hideAndReset);
+                }
+              // Focus is not touched here: the search-view effect below refocuses the
+              // input whenever the results change, which seeding the query does.
+              : () => setQuery(">cwd "),
+          },
+        ];
+      }
+
       const commands = [
         {
           id: "refresh",
@@ -224,6 +210,12 @@ function App() {
             refreshApps();
             setQuery("");
           },
+        },
+        {
+          id: "cwd",
+          title: "Set shell folder",
+          subtitle: `where ! commands run · now ${shellCwd.replace(home, "~")}`,
+          run: () => setQuery(">cwd "),
         },
         {
           id: "slots",
@@ -345,9 +337,10 @@ function App() {
     killStateByPath,
     slots,
     home,
+    shellCwd,
+    saveShellCwd,
     hideAndReset,
     killRunningApp,
-    agentConfig,
     refreshApps,
     slotShortcutsEnabled,
     toggleSlotShortcuts,
@@ -599,8 +592,6 @@ function App() {
     );
   }
 
-  const agentLabel = parsed.kind === "agent" ? parsed.label : undefined;
-  const aiActive = parsed.kind === "agent" || parsed.kind === "agent-menu";
   const shellActive = parsed.kind === "shell";
   const hasQuery = query.trim().length > 0;
   const killHint = parsed.kind === "running-apps" && results.length > 0;
@@ -612,9 +603,7 @@ function App() {
         value={query}
         onChange={setQuery}
         onKeyDown={handleSearchKeyDown}
-        aiActive={aiActive}
         shellActive={shellActive}
-        agentLabel={agentLabel}
         onOpenSettings={() => setView("settings")}
       />
       {results.length > 0 && (

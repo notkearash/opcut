@@ -1,9 +1,9 @@
-import type { AgentTemplate, ParsedQuery } from "../types";
+import type { ParsedQuery } from "../types";
 
 interface ParseContext {
   homeDir: string;
+  /** Configured default shell folder, used when the query has no inline `@ <path>`. */
   defaultCwd: string;
-  agents: AgentTemplate[];
 }
 
 /** Display-expand a leading `~` using the known home dir. */
@@ -18,14 +18,22 @@ export function expandTilde(path: string, homeDir: string): string {
 const CWD_MARKER = /\s@\s+([~/.][^\s]*)\s*$/;
 
 export function parseQuery(raw: string, ctx: ParseContext): ParsedQuery {
-  // Keep a trailing space significant ("?oc " means "agent picked, type the task")
-  // while ignoring leading whitespace.
+  // Keep a trailing space significant (">cwd " means "the command is chosen, type the
+  // path") while ignoring leading whitespace.
   const s = raw.replace(/^\s+/, "");
   if (s.length === 0) return { kind: "empty" };
 
-  // Command palette — "> …"
+  // Command palette — "> …". `head`/`arg` split lets a command take an argument
+  // (">cwd ~/src") while `partial` still fuzzes over the whole thing for filtering.
   if (s[0] === ">") {
-    return { kind: "command-menu", partial: s.slice(1).trim().toLowerCase() };
+    const rest = s.slice(1).replace(/^\s+/, "");
+    const sp = rest.indexOf(" ");
+    return {
+      kind: "command-menu",
+      partial: rest.trim().toLowerCase(),
+      head: (sp === -1 ? rest : rest.slice(0, sp)).toLowerCase(),
+      arg: sp === -1 ? "" : rest.slice(sp + 1).trim(),
+    };
   }
 
   // Running-app search — "/ …" lists apps that are already open.
@@ -52,39 +60,6 @@ export function parseQuery(raw: string, ctx: ParseContext): ParsedQuery {
       cwd: expandTilde(cwd, ctx.homeDir),
       cwdSource,
     };
-  }
-
-  // Agent prefixes — "?" lists agents; "?oc <task>" runs one.
-  if (s[0] === "?") {
-    const sp = s.indexOf(" ");
-    if (sp === -1) {
-      // Still typing the prefix → show the agent menu, filtered by the letters so far.
-      return { kind: "agent-menu", partial: s.slice(1).toLowerCase() };
-    }
-    const id = s.slice(1, sp).toLowerCase();
-    const agent = ctx.agents.find((a) => a.id === id);
-    if (agent) {
-      let rest = s.slice(sp + 1).trim();
-
-      let cwd = ctx.defaultCwd;
-      let cwdSource: "inline" | "default" = "default";
-      const cwdMatch = rest.match(CWD_MARKER);
-      if (cwdMatch) {
-        cwd = cwdMatch[1];
-        cwdSource = "inline";
-        rest = rest.slice(0, cwdMatch.index).trim();
-      }
-
-      return {
-        kind: "agent",
-        agentId: agent.id,
-        label: agent.label,
-        prompt: rest,
-        cwd: expandTilde(cwd, ctx.homeDir),
-        cwdSource,
-      };
-    }
-    // Unknown agent id: fall through to app search.
   }
 
   return { kind: "apps", text: s.trim() };

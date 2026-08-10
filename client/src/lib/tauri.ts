@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AgentConfig, AppInfo, AppConfig, SlotConfig } from "../types";
+import type { AppInfo, AppConfig, SlotConfig } from "../types";
 
 export const getInstalledApps = () => invoke<AppInfo[]>("get_installed_apps");
 
@@ -25,13 +25,11 @@ export const launchOrFocusApp = (path: string) =>
 export const terminateRunningApp = (path: string) =>
   invoke<void>("terminate_running_app", { path });
 
-export const getAgentConfig = () => invoke<AgentConfig>("get_agent_config");
+export const getShellCwd = () => invoke<string>("get_shell_cwd");
 
-export const setAgentConfig = (config: AgentConfig) =>
-  invoke<AgentConfig>("set_agent_config", { config });
-
-export const runAgentQuery = (agentId: string, prompt: string, cwd: string) =>
-  invoke<void>("run_agent_query", { agentId, prompt, cwd });
+/** Saves the default shell folder; resolves to the path actually stored. */
+export const setShellCwd = (path: string) =>
+  invoke<string>("set_shell_cwd", { path });
 
 export const runShellCommand = (command: string, cwd: string) =>
   invoke<void>("run_shell_command", { command, cwd });
