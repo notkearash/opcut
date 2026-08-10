@@ -8,15 +8,22 @@
     --font-mono:
         ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
 
-    /* Refined dark glass palette */
-    --panel: rgba(18, 18, 21, 0.66);
-    --panel-edge: rgba(255, 255, 255, 0.1);
-    --panel-edge-top: rgba(255, 255, 255, 0.16);
-    --hairline: rgba(255, 255, 255, 0.07);
+    /* Refined dark glass palette — opaque enough to read as a solid instrument
+       rather than a translucent overlay, with definite edges to sit on. */
+    --panel: rgba(16, 16, 19, 0.84);
+    --panel-edge: rgba(255, 255, 255, 0.14);
+    --panel-edge-top: rgba(255, 255, 255, 0.2);
+    --hairline: rgba(255, 255, 255, 0.09);
+    /* Structural bands: the search header and the footer, so the list reads as a
+       separate surface between them. */
+    --band-top: rgba(255, 255, 255, 0.04);
+    --band-bottom: rgba(0, 0, 0, 0.2);
+    --fill: rgba(255, 255, 255, 0.07);
+    --fill-edge: rgba(255, 255, 255, 0.09);
 
-    --text: rgba(246, 246, 248, 0.96);
-    --text-dim: rgba(236, 236, 242, 0.5);
-    --text-faint: rgba(236, 236, 242, 0.28);
+    --text: rgba(246, 246, 248, 0.97);
+    --text-dim: rgba(236, 236, 242, 0.58);
+    --text-faint: rgba(236, 236, 242, 0.34);
 
     /* Monochrome accent — pure light on deep black */
     --accent: #f6f6f8;
@@ -36,8 +43,18 @@
     --kill: #ff8a8a; /* app declined to quit */
     --kill-rgb: 255, 138, 138;
 
-    --radius-panel: 16px;
-    --radius-row: 10px;
+    --radius-panel: 14px;
+    --radius-row: 9px;
+
+    /* One media scale for every leading visual, so nothing looks off-size next to
+       its neighbours. Icons fill the slot (their art carries built-in padding);
+       filled badges sit slightly inset so they read at the same optical weight. */
+    --media: 28px;
+    --media-badge: 26px;
+    --media-glyph: 16px;
+    /* Compact variant for the settings rows and the app picker. */
+    --media-compact: 22px;
+    --media-glyph-compact: 14px;
 }
 
 * {
@@ -66,15 +83,18 @@ body {
 }
 
 ::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
 }
 ::-webkit-scrollbar-track {
     background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
-    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.28);
+    background-clip: content-box;
 }

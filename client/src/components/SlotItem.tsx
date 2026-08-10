@@ -20,7 +20,7 @@ export default function SlotItem({ index, app, icon, onClick }: SlotItemProps) {
         {icon ? (
           <img className="slot-icon" src={icon} alt="" draggable={false} />
         ) : (
-          <AppGlyph size={14} />
+          <AppGlyph />
         )}
       </span>
       <span className="slot-app-name">{app ? app.name : "Assign app..."}</span>

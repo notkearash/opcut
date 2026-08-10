@@ -5,6 +5,7 @@
  */
 
 interface GlyphProps {
+  /** Fallback only — the containing rule sets the real size (see `--media-glyph`). */
   size?: number;
 }
 

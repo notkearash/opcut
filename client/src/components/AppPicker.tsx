@@ -88,7 +88,7 @@ export default function AppPicker({
                     draggable={false}
                   />
                 ) : (
-                  <AppGlyph size={14} />
+                  <AppGlyph />
                 )}
               </span>
               <span className="app-picker-name">{app.name}</span>

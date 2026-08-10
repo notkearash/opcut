@@ -26,9 +26,9 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
           {aiActive ? (
             <span className="ai-orb" />
           ) : shellActive ? (
-            <ShellGlyph size={17} />
+            <ShellGlyph />
           ) : (
-            <SearchGlyph size={17} />
+            <SearchGlyph />
           )}
         </span>
         {agentLabel && <span className="agent-chip">{agentLabel}</span>}
