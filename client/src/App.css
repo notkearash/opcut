@@ -746,3 +746,164 @@
     font-family: var(--font-mono);
     font-size: 12px;
 }
+
+.settings-btn[data-open="true"] {
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.16);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.28);
+}
+
+.route-menu-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+}
+
+.route-menu {
+    position: absolute;
+    top: 52px;
+    right: 12px;
+    z-index: 6;
+    width: 268px;
+    padding: 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border-radius: 12px;
+    border: 1px solid var(--panel-edge);
+    border-top-color: var(--panel-edge-top);
+    background: rgba(28, 28, 32, 0.97);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 18px 40px rgba(0, 0, 0, 0.55),
+        0 4px 12px rgba(0, 0, 0, 0.4);
+    transform-origin: top right;
+    animation: route-menu-in 0.13s ease-out;
+}
+
+.route-menu::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    right: 14px;
+    width: 9px;
+    height: 9px;
+    transform: rotate(45deg);
+    background: rgba(28, 28, 32, 0.97);
+    border-left: 1px solid var(--panel-edge-top);
+    border-top: 1px solid var(--panel-edge-top);
+    border-radius: 2px 0 0 0;
+}
+
+@keyframes route-menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.route-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: 46px;
+    flex-shrink: 0;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.route-menu-item[data-selected="true"] {
+    background: var(--sel-bg);
+    box-shadow: inset 0 0 0 1px var(--sel-edge);
+}
+
+.route-keycap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--media-badge);
+    height: var(--media-badge);
+    border-radius: 7px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--text-dim);
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.13),
+        rgba(255, 255, 255, 0.05)
+    );
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 1.5px 0 rgba(0, 0, 0, 0.55);
+    transition:
+        transform 0.12s ease,
+        box-shadow 0.12s ease,
+        color 0.12s ease;
+}
+
+.route-menu-item[data-selected="true"] .route-keycap {
+    color: var(--accent);
+    transform: translateY(1.5px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.26),
+        inset 0 0 0 1px rgba(var(--accent-rgb), 0.24),
+        0 0 0 rgba(0, 0, 0, 0.55);
+}
+
+.route-menu-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.route-menu-label {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.route-menu-item[data-selected="true"] .route-menu-label {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.route-menu-caption {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .route-menu {
+        animation: none;
+    }
+    .route-keycap {
+        transition: none;
+    }
+}

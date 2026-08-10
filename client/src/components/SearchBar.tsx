@@ -6,11 +6,12 @@ interface SearchBarProps {
   onChange: (v: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   shellActive: boolean;
-  onOpenSettings: () => void;
+  menuOpen: boolean;
+  onToggleMenu: () => void;
 }
 
 const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
-  ({ value, onChange, onKeyDown, shellActive, onOpenSettings }, ref) => {
+  ({ value, onChange, onKeyDown, shellActive, menuOpen, onToggleMenu }, ref) => {
     return (
       <div className="search-bar" data-shell={shellActive ? "true" : "false"}>
         <span className="search-glyph" aria-hidden>
@@ -30,9 +31,12 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(
         />
         <button
           className="settings-btn"
-          title="Configure quick slots"
+          title="Show modes"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          data-open={menuOpen}
           tabIndex={-1}
-          onClick={onOpenSettings}
+          onClick={onToggleMenu}
         >
           ⌥
         </button>

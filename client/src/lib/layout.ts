@@ -10,6 +10,22 @@ export const SETTINGS_HEADER_PX = 44;
 export const SLOT_ROW_PX = 44;
 export const SLOT_COUNT = 9;
 
+export const ROUTE_MENU_ROW_PX = 46;
+export const ROUTE_MENU_PADDING_PX = 7;
+export const ROUTE_MENU_TOP_GAP_PX = 6;
+export const ROUTE_MENU_BOTTOM_GAP_PX = 12;
+
+export function routeMenuWindowHeight(itemCount: number): number {
+  return (
+    SHADOW_GUTTER_PX * 2 +
+    SEARCH_ROW_PX +
+    ROUTE_MENU_TOP_GAP_PX +
+    ROUTE_MENU_PADDING_PX * 2 +
+    itemCount * ROUTE_MENU_ROW_PX +
+    ROUTE_MENU_BOTTOM_GAP_PX
+  );
+}
+
 export function panelHeight(rowCount: number, hasQuery: boolean): number {
   let height = SEARCH_ROW_PX;
   if (rowCount > 0) {

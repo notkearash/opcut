@@ -7,6 +7,7 @@ import { useAppData } from "./hooks/useAppData";
 import { useAppIcons } from "./hooks/useAppIcons";
 import { useKeyboardNav } from "./hooks/useKeyboardNav";
 import { useMouseRejection } from "./hooks/useMouseRejection";
+import { useRouteMenu } from "./hooks/useRouteMenu";
 import { parseQuery } from "./lib/parseQuery";
 import { fuzzySearch } from "./lib/fuzzy";
 import { joinIconPaths, splitIconPaths } from "./lib/iconPaths";
@@ -19,12 +20,14 @@ import {
 } from "./lib/tauri";
 import {
   WIN_W,
+  routeMenuWindowHeight,
   settingsWindowHeight,
   windowHeight,
 } from "./lib/layout";
 import SearchBar from "./components/SearchBar";
 import ResultList from "./components/ResultList";
 import SettingsView from "./components/SettingsView";
+import RouteMenu from "./components/RouteMenu";
 import "./App.css";
 
 type View = "search" | "settings";
@@ -37,6 +40,8 @@ const KILL_FAILED_ROW_LINGER_MS = 2600;
 const COMMIT_RETRY_LIMIT = 30;
 const COMMIT_RETRY_DELAY_MS = 16;
 const RUNNING_APPS_QUERY = "/ ";
+const COMMAND_MENU_QUERY = "> ";
+const SHELL_QUERY = "! ";
 
 function killTitle(status?: KillStatus) {
   if (status === "terminating") return "Terminating...";
@@ -381,6 +386,37 @@ function App() {
     switcherPhase === "cycling",
   );
 
+  const routeMenuItems = useMemo(
+    () => [
+      {
+        keycap: "/",
+        label: "Open apps",
+        caption: "switch to a running app",
+        onActivate: () => setQuery(RUNNING_APPS_QUERY),
+      },
+      {
+        keycap: ">",
+        label: "Commands",
+        caption: "shell folder, icons, gestures",
+        onActivate: () => setQuery(COMMAND_MENU_QUERY),
+      },
+      {
+        keycap: "!",
+        label: "Shell",
+        caption: "run a command in a terminal",
+        onActivate: () => setQuery(SHELL_QUERY),
+      },
+      {
+        keycap: "⌥",
+        label: "Quick slots",
+        caption: "assign apps to ⌥1–9",
+        onActivate: () => setView("settings"),
+      },
+    ],
+    [],
+  );
+  const routeMenu = useRouteMenu(routeMenuItems);
+
   const { acceptHover, disarmHover } = useMouseRejection();
 
   const handleHover = useCallback(
@@ -544,25 +580,27 @@ function App() {
           return;
         }
       }
+      if (routeMenu.handleKeyDown(e)) return;
       if (isVerticalArrow(e)) disarmHover();
       onKeyDown(e);
     },
-    [onKeyDown, changeSwitcherPhase, disarmHover],
+    [onKeyDown, changeSwitcherPhase, disarmHover, routeMenu],
   );
 
   const lastWindowHeight = useRef(0);
   useLayoutEffect(() => {
-    const height =
-      view === "settings"
-        ? settingsWindowHeight()
-        : windowHeight(results.length, query.trim().length > 0);
+    const searchHeight = Math.max(
+      windowHeight(results.length, query.trim().length > 0),
+      routeMenu.open ? routeMenuWindowHeight(routeMenuItems.length) : 0,
+    );
+    const height = view === "settings" ? settingsWindowHeight() : searchHeight;
     if (height === lastWindowHeight.current) return;
     lastWindowHeight.current = height;
     const raf = requestAnimationFrame(() => {
       getCurrentWindow().setSize(new LogicalSize(WIN_W, height));
     });
     return () => cancelAnimationFrame(raf);
-  }, [results.length, view, query]);
+  }, [results.length, view, query, routeMenu.open, routeMenuItems.length]);
 
   if (view === "settings") {
     return (
@@ -596,8 +634,18 @@ function App() {
         onChange={setQuery}
         onKeyDown={handleSearchKeyDown}
         shellActive={shellActive}
-        onOpenSettings={() => setView("settings")}
+        menuOpen={routeMenu.open}
+        onToggleMenu={routeMenu.toggle}
       />
+      {routeMenu.open && (
+        <RouteMenu
+          items={routeMenuItems}
+          selected={routeMenu.selected}
+          onSelect={routeMenu.setSelected}
+          onActivate={routeMenu.activate}
+          onClose={routeMenu.close}
+        />
+      )}
       {results.length > 0 && (
         <>
           <div className="divider" />
